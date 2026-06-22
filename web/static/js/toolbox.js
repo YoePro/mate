@@ -1,0 +1,3 @@
+window.MateToolbox = {
+	ready: true,
+};

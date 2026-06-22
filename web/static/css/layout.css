@@ -1,0 +1,38 @@
+.app-shell {
+	display: grid;
+	grid-template-rows: auto 1fr;
+	min-height: 100vh;
+}
+
+.app-header {
+	align-items: center;
+	background: var(--color-surface);
+	border-bottom: 1px solid var(--color-border);
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+}
+
+.app-main {
+	display: grid;
+	grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+	min-height: 0;
+}
+
+.workspace {
+	min-height: calc(100vh - 4.25rem);
+	padding: 1rem;
+}
+
+@media (max-width: 720px) {
+	.app-header {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.app-main {
+		grid-template-columns: 1fr;
+	}
+}

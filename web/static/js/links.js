@@ -1,0 +1,3 @@
+window.MateLinks = {
+	types: ["knows"],
+};

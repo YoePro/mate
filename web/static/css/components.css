@@ -1,0 +1,13 @@
+.workspace-empty {
+	align-items: center;
+	background: var(--color-surface);
+	border: 1px dashed var(--color-border);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	justify-content: center;
+	min-height: 20rem;
+	padding: 2rem;
+	text-align: center;
+}

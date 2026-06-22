@@ -10,6 +10,20 @@ Base URL:
 
 All requests and responses use JSON.
 
+The web frontend is served by the same Go application.
+
+---
+
+## Web frontend
+
+### GET /
+
+Returns the MATE HTML application shell.
+
+### GET /static/
+
+Serves frontend assets from `web/static`, including CSS, JavaScript, images, fonts, and icons.
+
 ---
 
 ## Health
