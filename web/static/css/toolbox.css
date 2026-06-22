@@ -1,16 +1,100 @@
-.toolbox-panel {
-	background: var(--color-surface);
-	border-right: 1px solid var(--color-border);
-	padding: 1rem;
+#toolbox {
+  width: 160px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 4px;
+  overflow-y: auto;
 }
 
-.toolbox-panel h2 {
-	margin-bottom: 0.35rem;
+.toolbox-section {
+  margin-bottom: 8px;
 }
 
-@media (max-width: 720px) {
-	.toolbox-panel {
-		border-bottom: 1px solid var(--color-border);
-		border-right: 0;
-	}
+.toolbox-heading {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+.tool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: background 0.12s, color 0.12s;
+  cursor: pointer;
+}
+
+.tool-item:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.tool-item:active {
+  background: var(--bg-elevated);
+}
+
+.tool-item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.tool-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-person      { background: var(--node-person); }
+.dot-company     { background: var(--node-company); }
+.dot-association { background: var(--node-association); }
+.dot-school      { background: var(--node-school); }
+.dot-location    { background: var(--node-location); }
+.dot-tag         { background: var(--node-tag); }
+
+.tool-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toolbox-hint {
+  margin-top: auto;
+  padding: 10px 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.toolbox-hint p {
+  margin-bottom: 8px;
+}
+
+.hint-keys {
+  line-height: 1.8;
+}
+
+.hint-keys kbd {
+  display: inline-block;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0px 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }

@@ -1,38 +1,93 @@
-.app-shell {
-	display: grid;
-	grid-template-rows: auto 1fr;
-	min-height: 100vh;
+#header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  height: 52px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 100;
 }
 
-.app-header {
-	align-items: center;
-	background: var(--color-surface);
-	border-bottom: 1px solid var(--color-border);
-	display: flex;
-	gap: 1rem;
-	justify-content: space-between;
-	padding: 1rem 1.25rem;
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.app-main {
-	display: grid;
-	grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
-	min-height: 0;
+.brand-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
 }
 
-.workspace {
-	min-height: calc(100vh - 4.25rem);
-	padding: 1rem;
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
 }
 
-@media (max-width: 720px) {
-	.app-header {
-		align-items: flex-start;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
+.brand-tagline {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
 
-	.app-main {
-		grid-template-columns: 1fr;
-	}
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.search-wrap {
+  position: relative;
+  width: 320px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+#search-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px 6px 34px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#search-input:focus {
+  border-color: var(--accent);
+}
+
+#search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
 }
