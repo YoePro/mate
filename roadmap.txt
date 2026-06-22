@@ -1,0 +1,943 @@
+MATE ROADMAP
+
+Friend Mapping program
+
+MATE is a personal relationship mapping system. The purpose is to help keep track of friends, family, organizations, shared history, activities, and relevant context. It should work like a small private CRM for friends and family, with a graph based interface inspired by Node RED but adapted for human relationships.
+
+MATE can stand for:
+Memories, Alliances, Time, Engagement
+
+Core idea:
+
+MATE is a cloud of connection: people are nodes, and their shared history, likely acquaintances, and relationship paths form a soft network around them. The goal is to capture the living network and its heritage, including those who are no longer with us.
+
+* Remember people
+* Remember how people are connected
+* Remember where people belong
+* Remember shared experiences
+* Remember achievements, awards, roles, and career status
+* Make it easier to follow up with people over time
+
+Primary design principles:
+
+* Local first
+* Private by default
+* Simple Go backend
+* Vanilla HTML, CSS, and JavaScript frontend
+* Neo4j as graph storage
+* Minimal external dependencies
+* Model personal metadata such as titles, awards, board memberships, competitions, and deceased status from the start
+* main.go should stay very small
+* Business logic belongs in internal/services
+* HTTP logic belongs in internal/handlers
+* Storage logic belongs in internal/storage
+* Configuration belongs in internal/config
+* Documentation should be kept close to the implementation
+
+Version logic:
+
+* 0.1, 0.3, 0.5, 0.7 = development versions
+* 0.2, 0.4, 0.6, 0.8 = debug and stabilization versions
+* 0.9 = beta
+* 1.0 = first stable release
+* From 1.0 onward:
+
+  * odd minor versions = development
+  * even minor versions = release and stable versions
+* Patch versions such as 0.1.1, 0.1.2, 0.2.1 are allowed for small corrections, documentation updates, cleanup, and minor internal adjustments.
+
+Roadmap format:
+Each version contains:
+
+* Goal
+* Scope
+* Implementation checklist
+* Acceptance criteria
+* Test checklist
+* Documentation checklist
+
+Do not place actual code in this file.
+This file should describe what must exist, when it is considered done, and how it should be tested.
+
+0.1 Development
+
+Goal:
+Create the minimal Go application structure and prove that the backend can start and answer a request.
+
+Scope:
+This version only proves the backend foundation. No frontend behavior, no database integration, and no graph logic are required yet.
+
+Implementation checklist:
+
+* Create Go module for MATE.
+* Create cmd/mate/main.go.
+* Keep main.go as small as possible.
+* Create internal/app.
+* Create internal/config.
+* Create internal/server.
+* Create internal/handlers.
+* Create internal/services.
+* Create internal/storage.
+* Create internal/models.
+* Create docs folder.
+* Create docs/api.md.
+* Create roadmap.txt.
+* Define default configuration in internal/config.
+* Add support for optional `.mate.ini` or `mate.ini` configuration files.
+* Use port 8325 as default server port.
+* Add server startup through internal/app.
+* Add HTTP server setup in internal/server.
+* Add /health endpoint through internal/handlers.
+* Add empty or minimal service files with correct package declarations.
+* Add empty or minimal model files with correct package declarations.
+* Add storage.Storage interface as the future abstraction for persistence.
+
+Acceptance criteria:
+
+* The project builds without package errors.
+* The application starts with go run ./cmd/mate.
+* The server listens on port 8325.
+* GET /health returns a successful response.
+* main.go only delegates startup to the app layer.
+* server.go only configures and starts the HTTP server.
+* No business logic exists in main.go.
+* No database logic exists in handlers.
+
+Test checklist:
+
+* Run go run ./cmd/mate.
+* Run curl http://localhost:8325/health.
+* Confirm HTTP 200.
+* Confirm response text is understandable, for example MATE is running.
+* Confirm default config loads when `.mate.ini` is absent.
+* Confirm `.mate.ini` overrides default config if present.
+* Run go test ./... when tests exist.
+* Run find internal -name "*.go" -size 0 and confirm no empty Go files exist.
+
+Documentation checklist:
+
+* docs/api.md exists.
+* roadmap.txt exists.
+* API documentation includes /health.
+* `README.md` or docs include `.mate.ini` usage and configuration file guidance.
+* Roadmap explains version logic.
+
+0.1.1 Development patch
+
+Goal:
+Clean the first development structure without changing functionality.
+
+Scope:
+Small cleanup after 0.1.
+
+Implementation checklist:
+
+* Remove unused duplicate route handlers.
+* Remove unused functions from server.go.
+* Confirm package names match folders.
+* Confirm comments are in English.
+* Confirm function comments exist for exported functions.
+* Confirm folder structure matches project decisions.
+
+Acceptance criteria:
+
+* No unused handler functions remain.
+* go run ./cmd/mate still works.
+* /health still works.
+* The structure is understandable without reading the full source.
+
+Test checklist:
+
+* Run go test ./...
+* Run go run ./cmd/mate.
+* Test /health manually.
+
+Documentation checklist:
+
+* Update roadmap.txt if structure changes.
+* Update docs/api.md if endpoint behavior changes.
+
+0.2 Debug
+
+Goal:
+Stabilize the backend skeleton.
+
+Scope:
+No new features unless needed to fix structure or testability.
+
+Implementation checklist:
+
+* Review internal folder structure.
+* Remove internal/api if not used.
+* Remove internal/db if not used.
+* Keep internal/handlers as the HTTP handler layer.
+* Keep internal/services as the business logic layer.
+* Keep internal/storage as the persistence abstraction layer.
+* Keep internal/models as the data model layer.
+* Keep internal/config as the configuration layer.
+* Ensure all Go files have correct package declarations.
+* Ensure all exported functions have comments.
+* Add minimal Go tests where meaningful.
+* Add tests for config loading.
+* Add tests for health handler behavior.
+* Add tests for router creation if practical.
+
+Acceptance criteria:
+
+* go test ./... passes.
+* go run ./cmd/mate starts cleanly.
+* No unused folders remain unless intentionally documented.
+* No empty Go files exist.
+* The backend skeleton is stable enough to build on.
+
+Test checklist:
+
+* Run go test ./...
+* Run go vet ./... if desired.
+* Run go run ./cmd/mate.
+* Test /health with curl.
+* Confirm no browser or API work is required for this version.
+
+Documentation checklist:
+
+* Update docs/api.md with current endpoint list.
+* Update roadmap.txt with any structural corrections.
+* Document current project folder responsibilities.
+
+0.3 Development
+
+Goal:
+Serve the web frontend from the Go backend.
+
+Scope:
+Basic frontend loading only. No advanced graph logic yet.
+
+Implementation checklist:
+
+* Create web/html/index.html.
+* Create web/static.
+* Create web/static/css.
+* Create web/static/js.
+* Create web/static/img.
+* Create web/static/fonts.
+* Create web/static/icons.
+* Create web/static/css/README.md.
+* Create web/static/js/README.md.
+* Add CSS files:
+
+  * reset.css
+  * main.css
+  * layout.css
+  * components.css
+  * graph.css
+  * toolbox.css
+* Add JavaScript files:
+
+  * app.js
+  * router.js
+  * api.js
+  * dom.js
+  * canvas.js
+  * graph.js
+  * nodes.js
+  * links.js
+  * toolbox.js
+* Serve web/html/index.html from /.
+* Serve static assets from /static/.
+* Add basic HTML shell.
+* Add basic title and visible MATE heading.
+* Load CSS from /static/css.
+* Load JavaScript from /static/js.
+* Add a visible page area for the future application.
+
+Acceptance criteria:
+
+* GET / loads index.html.
+* Static CSS files can be loaded by the browser.
+* Static JS files can be loaded by the browser.
+* Browser console confirms app.js is loaded.
+* No frontend framework is required.
+* The page is served by the Go application.
+
+Test checklist:
+
+* Open http://localhost:8325/.
+* Confirm the page loads.
+* Confirm CSS is applied.
+* Confirm app.js runs.
+* Check browser console for errors.
+* Test direct access to /static/css/main.css.
+* Test direct access to /static/js/app.js.
+* Confirm /health still works.
+
+Documentation checklist:
+
+* Update docs/api.md to mention / and /static/.
+* CSS README explains purpose of each CSS file.
+* JS README explains purpose of each JS file.
+
+0.4 Debug
+
+Goal:
+Stabilize the frontend loading and static file delivery.
+
+Scope:
+No major UI features. Focus on reliability, paths, and structure.
+
+Implementation checklist:
+
+* Verify all linked CSS paths.
+* Verify all linked JS paths.
+* Check HTML validity.
+* Check static file routing.
+* Confirm index handler does not interfere with API routes.
+* Confirm /api/v1 routes still work.
+* Confirm /health still works.
+* Confirm unknown static files return proper missing file responses.
+* Add a simple manual browser smoke test checklist.
+
+Acceptance criteria:
+
+* The frontend loads reliably.
+* No console errors exist on initial page load.
+* API routes are not captured by the index route.
+* Static assets are served only from /static/.
+* Project can be started and manually tested in under one minute.
+
+Test checklist:
+
+* Browser test of /.
+* Browser test of CSS load.
+* Browser test of JS load.
+* Curl test /health.
+* Curl test /api/v1/persons if stub exists.
+* Curl test missing static file.
+* Confirm browser refresh works on /.
+
+Documentation checklist:
+
+* Update docs/api.md.
+* Add manual frontend smoke test section if not already documented.
+* Document expected local development URL.
+
+0.5 Development
+
+Goal:
+Build the first Node RED inspired graph UI shell.
+
+Scope:
+Visual graph interface only. Data can be hardcoded or temporary in frontend state.
+
+Implementation checklist:
+
+* Add main application layout.
+* Add header or top bar.
+* Add left toolbox.
+* Add central workspace.
+* Add optional right side inspector panel placeholder.
+* Add SVG layer for links.
+* Add div layer for nodes.
+* Define visual node types:
+
+  * Person
+  * Company
+  * Association
+  * School
+  * Location
+  * Tag
+* Add basic node cards.
+* Add basic node icons or labels.
+* Add draggable node behavior.
+* Add selection behavior.
+* Add simple link rendering between two nodes.
+* Add toolbox entries for each node type.
+* Add placeholder inspector for selected node.
+* Add frontend state object in graph.js.
+* Add node rendering functions in nodes.js.
+* Add link rendering functions in links.js.
+* Add toolbox behavior in toolbox.js.
+* Add workspace coordinate handling in canvas.js.
+
+Acceptance criteria:
+
+* User can see toolbox and workspace.
+* User can create or display at least one node.
+* User can move a node visually.
+* User can select a node.
+* Links can be drawn visually between existing nodes.
+* UI visually resembles a node based workspace.
+* No backend persistence is required yet.
+
+Test checklist:
+
+* Open page in browser.
+* Confirm toolbox is visible.
+* Confirm workspace is visible.
+* Confirm node layer is visible.
+* Confirm SVG link layer is visible.
+* Create or display a Person node.
+* Drag the node.
+* Select the node.
+* Confirm selected state is visible.
+* Confirm no console errors occur.
+
+Documentation checklist:
+
+* JS README explains graph.js, nodes.js, links.js, canvas.js, toolbox.js.
+* CSS README explains graph.css and toolbox.css.
+* Add short UI concept notes to roadmap or docs.
+
+0.5.1 Development patch
+
+Goal:
+Improve graph UI usability before stabilization.
+
+Scope:
+Small visual and interaction improvements only.
+
+Implementation checklist:
+
+* Add snap or simple coordinate consistency if needed.
+* Add hover states.
+* Add selected node styling.
+* Add basic empty workspace message.
+* Add toolbox section labels.
+* Add stable internal frontend IDs for temporary nodes.
+* Add comments to important JS functions.
+* Keep functions small and focused.
+
+Acceptance criteria:
+
+* UI feels understandable without instructions.
+* Visual node states are clear.
+* No major layout jumps occur when interacting.
+
+Test checklist:
+
+* Repeat 0.5 browser tests.
+* Test adding several nodes.
+* Test selecting different nodes.
+* Test dragging nodes near workspace edges.
+
+Documentation checklist:
+
+* Update JS README if responsibilities change.
+* Update CSS README if new style sections are added.
+
+0.6 Debug
+
+Goal:
+Stabilize the graph UI shell.
+
+Scope:
+No backend integration unless required for testing.
+
+Implementation checklist:
+
+* Test node dragging thoroughly.
+* Test link rendering after node movement.
+* Test toolbox behavior.
+* Test layout on desktop.
+* Test layout on narrower browser widths.
+* Refactor repeated JS logic.
+* Refactor repeated CSS rules.
+* Ensure JavaScript follows project style:
+
+  * classList.add instead of className
+  * avoid innerHTML except for clearing
+  * early exits
+  * small functions
+  * English comments
+  * DocumentFragment for larger DOM updates
+* Ensure CSS file responsibilities are clear.
+
+Acceptance criteria:
+
+* UI is stable enough to connect to backend later.
+* Moving nodes updates link positions.
+* Toolbox does not break layout.
+* No console errors.
+* Code is understandable and modular.
+
+Test checklist:
+
+* Manual drag test.
+* Manual selection test.
+* Manual link redraw test.
+* Manual responsive layout test.
+* Browser console error check.
+* Refresh page and confirm clean reload.
+
+Documentation checklist:
+
+* Update frontend smoke test checklist.
+* Document known limitations.
+* Document next integration step.
+
+0.7 Development
+
+Goal:
+Add real backend API structure and temporary storage.
+
+Scope:
+Backend becomes useful without Neo4j. Temporary in-memory storage can be used for fast iteration.
+
+Implementation checklist:
+
+* Define API endpoint behavior in docs/api.md.
+* Add handlers for:
+
+  * persons
+  * organizations
+  * relationships
+  * graph
+* Add service methods for:
+
+  * create person
+  * list persons
+  * get person
+  * create organization
+  * list organizations
+  * get organization
+  * create relationship
+  * list relationships
+  * get graph
+* Define models for:
+
+  * Person
+  * Organization
+  * Relationship
+  * GraphNode
+  * GraphLink
+  * GraphResponse
+* Define organization types:
+
+  * company
+  * association
+  * school
+* Define supporting node types:
+
+  * location
+  * tag
+* Define relationship types:
+
+  * knows
+  * spouse_of
+  * parent_of
+  * sibling_of
+  * works_at
+  * member_of
+  * studied_at
+  * lives_in
+  * has_tag
+* Add in-memory storage implementation.
+* Ensure handlers call services.
+* Ensure services call storage.
+* Ensure handlers do not contain storage logic.
+* Ensure services do not contain HTTP response logic.
+* Add consistent JSON response helpers if needed.
+* Add profile page route or frontend view for Person.
+* Add person metadata support including:
+
+  * name
+  * nickname
+  * title or primary role
+  * CEO / Board member / award / competition notes
+  * notes
+  * tags
+  * organizations
+  * family relations
+  * friend relations
+  * deceased or legacy status
+  * activity placeholder
+* Add API connection through web/static/js/api.js.
+
+Acceptance criteria:
+
+* Persons can be created through API.
+* Persons can be listed through API.
+* Organizations can be created through API.
+* Organizations can be listed through API.
+* Relationships can be created through API.
+* Graph endpoint returns nodes and links.
+* Frontend can fetch graph data from backend.
+* Person profile view can show person details.
+* Data may reset on server restart in this version.
+
+Test checklist:
+
+* Test POST /api/v1/persons.
+* Test GET /api/v1/persons.
+* Test POST /api/v1/organizations.
+* Test GET /api/v1/organizations.
+* Test POST /api/v1/relationships.
+* Test GET /api/v1/graph.
+* Test invalid JSON.
+* Test missing required fields.
+* Test unknown IDs.
+* Test frontend graph load from backend.
+* Test profile page with known test person.
+* Run go test ./...
+
+Documentation checklist:
+
+* docs/api.md contains request and response examples.
+* docs/api.md documents error format.
+* docs/api.md documents relationship types.
+* roadmap.txt updated with any new entities.
+* Add note that storage is temporary in this version.
+
+0.8 Debug
+
+Goal:
+Stabilize API, services, frontend integration, and in-memory behavior.
+
+Scope:
+No Neo4j requirement yet. This is a full pre-database debug version.
+
+Implementation checklist:
+
+* Validate all incoming JSON.
+* Add required field checks.
+* Add consistent error response format.
+* Add correct status codes:
+
+  * 200 for successful read
+  * 201 for successful create
+  * 400 for invalid input
+  * 404 for missing resource
+  * 405 for wrong method if applicable
+  * 500 for unexpected server errors
+* Prevent duplicate IDs if IDs are client supplied.
+* Decide whether IDs are created server side.
+* Normalize organization type validation.
+* Normalize relationship type validation.
+* Add service level validation.
+* Add storage level tests.
+* Add handler tests.
+* Add service tests.
+* Add storage tests.
+* Review frontend API error handling.
+* Review privacy risk of exposing all graph data.
+* Add clear placeholder for future authentication.
+* Confirm profile page handles missing data gracefully.
+
+Acceptance criteria:
+
+* All documented endpoints behave consistently.
+* Invalid requests produce predictable errors.
+* Frontend does not crash on API errors.
+* API documentation matches behavior.
+* Basic tests exist for handlers, services, and storage.
+* In-memory storage is reliable enough for development.
+
+Test checklist:
+
+* Run go test ./...
+* Test happy path for all API endpoints.
+* Test invalid JSON.
+* Test empty request bodies.
+* Test missing required fields.
+* Test invalid relationship type.
+* Test invalid organization type.
+* Test unknown person ID.
+* Test unknown organization ID.
+* Test graph endpoint with empty data.
+* Test graph endpoint with sample data.
+* Test frontend when backend returns empty graph.
+* Test frontend when backend returns error.
+
+Documentation checklist:
+
+* docs/api.md updated.
+* Add test checklist to docs or roadmap.
+* Document current known security limitations.
+* Document that authentication is not yet implemented.
+
+0.9 Beta
+
+Goal:
+Connect MATE to Neo4j and use real graph storage.
+
+Scope:
+Replace or complement in-memory storage with Neo4j-backed storage. MATE becomes usable as a local beta.
+
+Implementation checklist:
+
+* Add Neo4j dependency.
+* Add Neo4j configuration fields:
+
+  * URI
+  * username
+  * password
+  * database name if needed
+* Add Neo4j storage implementation under internal/storage/neo4j or similar.
+* Keep storage.Storage interface as the boundary.
+* Implement Neo4j connection lifecycle.
+* Implement Close method.
+* Create constraints or indexes for key node IDs.
+* Store Person nodes.
+* Store Organization nodes.
+* Store Location nodes if used.
+* Store Tag nodes if used.
+* Store Relationship edges.
+* Implement create/read/list for persons.
+* Implement create/read/list for organizations.
+* Implement create/read/list for relationships.
+* Implement graph query for frontend.
+* Decide node labels:
+
+  * Person
+  * Organization
+  * Company
+  * Association
+  * School
+  * Location
+  * Tag
+* Decide whether Company, Association, and School are separate labels or organization subtypes.
+* Add basic edit forms.
+* Add update person.
+* Add update organization.
+* Add update relationship.
+* Add delete or archive strategy.
+* Prefer archive/soft delete for personal data unless explicitly removed.
+* Add backup/export plan.
+* Add import/export JSON plan.
+* Review private data handling.
+* Add beta release notes.
+
+Acceptance criteria:
+
+* MATE can store data in Neo4j.
+* Data survives server restart.
+* Existing API endpoints work with Neo4j storage.
+* Frontend graph loads real data from Neo4j.
+* Person profile page loads real data.
+* Basic create and edit flows work.
+* Delete/archive behavior is defined.
+* Backup/export is documented.
+
+Test checklist:
+
+* Start Neo4j.
+* Start MATE.
+* Create person through API.
+* Restart MATE.
+* Confirm person remains.
+* Create organization.
+* Create relationship.
+* Confirm graph endpoint returns real graph.
+* Confirm frontend renders real graph.
+* Test profile page for real person.
+* Test Neo4j unavailable behavior.
+* Test wrong Neo4j password behavior.
+* Run go test ./...
+* Run manual end to end test.
+
+Documentation checklist:
+
+* docs/api.md updated for Neo4j-backed behavior.
+* Add docs/configuration.md.
+* Add docs/storage.md.
+* Add docs/neo4j.md.
+* Add backup/export documentation.
+* Add privacy warning for local personal data.
+
+1.0 Stable
+
+Goal:
+Release the first stable local version of MATE.
+
+Scope:
+MATE should be usable for real personal relationship tracking on a local system.
+
+Implementation checklist:
+
+* Finalize core models:
+
+  * Person
+  * Organization
+  * Relationship
+  * Location
+  * Tag
+* Finalize supported organization types:
+
+  * company
+  * association
+  * school
+* Finalize supported relationship types:
+
+  * knows
+  * spouse_of
+  * parent_of
+  * sibling_of
+  * works_at
+  * member_of
+  * studied_at
+  * lives_in
+  * has_tag
+* Finalize Go backend structure.
+* Finalize vanilla frontend structure.
+* Finalize Neo4j storage.
+* Finalize graph UI.
+* Finalize person profile page.
+* Finalize basic create/edit/view flows.
+* Finalize person metadata support for titles, achievements, board-level roles, and deceased/legacy markers.
+* Finalize API documentation.
+* Finalize configuration documentation.
+* Finalize backup/export documentation.
+* Add release notes.
+* Review all comments and exported function docs.
+* Review security and privacy baseline.
+* Ensure no test or debug data is hardcoded into release.
+
+Acceptance criteria:
+
+* User can create and view persons.
+* User can create and view companies.
+* User can create and view associations.
+* User can create and view schools.
+* User can create and view relationships.
+* User can view a graph of relationships.
+* User can open a person profile.
+* User can see relevant relationships on profile page.
+* Data persists in Neo4j.
+* Application can be started reliably.
+* Documentation is sufficient to install, start, and use locally.
+
+Test checklist:
+
+* Run all Go tests.
+* Manual full workflow test:
+
+  * start MATE
+  * open browser
+  * create person
+  * create organization
+  * create relationship
+  * view graph
+  * open profile
+  * restart application
+  * confirm data persists
+* Test empty database.
+* Test sample database.
+* Test invalid API input.
+* Test frontend with API failure.
+* Test browser reload.
+* Test backup/export procedure if implemented.
+
+Documentation checklist:
+
+* roadmap.txt updated.
+* docs/api.md complete for 1.0.
+* docs/configuration.md complete.
+* docs/storage.md complete.
+* docs/neo4j.md complete.
+* README.md exists in project root.
+* README.md explains how to start MATE.
+* README.md explains project purpose.
+* README.md explains privacy assumptions.
+
+Future 1.x
+
+1.1 Development
+
+* Add authentication.
+* Add login page.
+* Add session handling.
+* Add protected routes.
+* Add user profile or owner profile.
+* Add improved config loading.
+* Add environment variable support.
+* Add optional config file support if needed.
+* Add search.
+* Add tag filtering.
+* Add better graph filtering.
+* Add relationship notes.
+* Add person notes.
+* Add activity tracking.
+* Add timeline entries.
+
+1.2 Release
+
+* Stabilize authentication.
+* Stabilize search.
+* Stabilize filtering.
+* Stabilize timeline.
+* Add tests for authentication.
+* Add tests for search.
+* Add tests for filtering.
+* Update documentation.
+
+1.3 Development
+
+* Add experiences module.
+* Add activities module.
+* Add reminders or follow up dates.
+* Add last contact date.
+* Add next contact suggestion.
+* Add relationship strength or relevance.
+* Add event history per person.
+* Add shared activity history between persons.
+
+1.4 Release
+
+* Stabilize experiences and activities.
+* Add import/export improvements.
+* Add backup and restore workflow.
+* Add release level test plan.
+* Add usability review.
+
+1.5 Development
+
+* Add better graph layout algorithms.
+* Add manual graph layout saving.
+* Add grouping by organization.
+* Add grouping by family.
+* Add grouping by school.
+* Add grouping by location.
+* Add visual filters.
+* Add compact and expanded node modes.
+
+1.6 Release
+
+* Stabilize graph layout features.
+* Improve performance with larger graphs.
+* Add frontend regression checklist.
+* Update UI documentation.
+
+1.7 Development
+
+* Add optional Docker setup.
+* Add optional systemd service.
+* Add deployment documentation.
+* Add automatic backup scheduling.
+* Add audit log.
+* Add protected fields.
+* Add encryption strategy for sensitive fields.
+
+1.8 Release
+
+* Stabilize deployment options.
+* Stabilize backup automation.
+* Stabilize audit log.
+* Review privacy and security again.
+* Complete release documentation.
+
+Long term ideas:
+
+* Import contacts from CSV or JSON.
+* Export complete graph to JSON.
+* Export person profile summary.
+* Add print friendly profile pages.
+* Add birthday and anniversary reminders.
+* Add recurring activity reminders.
+* Add relationship map snapshots.
+* Add private notes with stronger protection.
+* Add multi database support if needed.
+* Add optional mobile friendly layout.
+* Add optional image/avatar support.
+* Add optional document attachments.
+* Add optional calendar integration.
+* Add optional email or message log references.
+* Add a memorial or legacy view for people who have passed away.
