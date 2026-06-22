@@ -22,8 +22,8 @@ func TestLoad_DefaultConfig(t *testing.T) {
 
 	cfg := Load()
 
-	if cfg.ServerAddress != ":8325" {
-		t.Fatalf("expected default server address :8325, got %q", cfg.ServerAddress)
+	if cfg.ServerAddress != "0.0.0.0:8325" {
+		t.Fatalf("expected default server address 0.0.0.0:8325, got %q", cfg.ServerAddress)
 	}
 	if cfg.Neo4jURI != "neo4j://localhost:7687" {
 		t.Fatalf("expected default Neo4j URI neo4j://localhost:7687, got %q", cfg.Neo4jURI)

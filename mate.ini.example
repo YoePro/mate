@@ -1,5 +1,5 @@
 [server]
-address = :8325
+address = 0.0.0.0:8325
 
 [neo4j]
 uri = neo4j://localhost:7687

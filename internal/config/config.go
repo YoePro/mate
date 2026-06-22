@@ -30,7 +30,7 @@ func Load() Config {
 
 func defaultConfig() Config {
 	return Config{
-		ServerAddress: ":8325",
+		ServerAddress: "0.0.0.0:8325",
 
 		Neo4jURI:      "neo4j://localhost:7687",
 		Neo4jUser:     "neo4j",

@@ -15,5 +15,6 @@ The project is intended to function as a private CRM for friends, family, organi
 Configuration:
 
 - Create a local `.mate.ini` or `mate.ini` file to override the default settings.
+- The default server address is `0.0.0.0:8325`, which listens on all network interfaces.
 - Keep credentials private; `.mate.ini` is included in `.gitignore`.
 - Run the server with `go run ./cmd/mate`.
