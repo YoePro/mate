@@ -54,6 +54,7 @@ address = :9000
 uri = bolt://example:7687
 user = testuser
 password = testpass
+database = testdb
 `)
 
 	if err := os.WriteFile(filepath.Join(dir, ".mate.ini"), contents, 0o600); err != nil {
@@ -73,5 +74,8 @@ password = testpass
 	}
 	if cfg.Neo4jPassword != "testpass" {
 		t.Fatalf("expected Neo4j password testpass, got %q", cfg.Neo4jPassword)
+	}
+	if cfg.Neo4jDatabase != "testdb" {
+		t.Fatalf("expected Neo4j database testdb, got %q", cfg.Neo4jDatabase)
 	}
 }

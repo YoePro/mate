@@ -1,7 +1,7 @@
 // API layer — calls the Go backend at /api/v1
 // window.MATE_CONFIG is loaded from /static/js/config.js served by the backend.
 
-const BASE = '/api/v1';
+const BASE = (window.MATE_CONFIG && window.MATE_CONFIG.apiBasePath) || '/api/v1';
 
 async function apiFetch(path, options) {
   const res = await fetch(BASE + path, Object.assign({
@@ -67,4 +67,28 @@ async function apiDeleteRelationship(id) {
 
 async function apiSearchAll(query) {
   return apiFetch('/search?q=' + encodeURIComponent(query));
+}
+
+async function apiListPersonAttributes(personId) {
+  return apiFetch('/persons/' + personId + '/attributes');
+}
+
+async function apiCreatePersonAttribute(personId, data) {
+  return apiFetch('/persons/' + personId + '/attributes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function apiListAttributes(ownerType, ownerId) {
+  const path = ownerType === 'person' ? 'persons' : 'organizations';
+  return apiFetch('/' + path + '/' + ownerId + '/attributes');
+}
+
+async function apiCreateAttribute(ownerType, ownerId, data) {
+  const path = ownerType === 'person' ? 'persons' : 'organizations';
+  return apiFetch('/' + path + '/' + ownerId + '/attributes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }

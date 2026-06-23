@@ -4,11 +4,17 @@
 let modalEntityType = null;
 let modalEntityId = null;
 let modalX = 0, modalY = 0;
+let attributeOwnerType = null;
+let attributeOwnerId = null;
 
 let temporaryIdCounter = 1;
 
 function isTemporaryGraphMode() {
   return Boolean(window.MATE_CONFIG && window.MATE_CONFIG.temporaryGraph);
+}
+
+function isOrganizationEntityType(entityType) {
+  return entityType === 'company' || entityType === 'association' || entityType === 'school';
 }
 
 function isTemporaryApiError(err) {
@@ -52,6 +58,7 @@ async function boot() {
   initInspector();
   initModals();
   initLinkModal();
+  initAttributeModal();
   initSearch();
   initKeyboard();
   initHeaderButtons();
@@ -156,6 +163,26 @@ function renderInspector(nodeId) {
       title.textContent = node.data.title;
       body.appendChild(title);
     }
+    if (node.data.gender) {
+      const gender = createEl('div', 'inspector-subtitle');
+      gender.textContent = `Gender: ${GENDER_LABELS[node.data.gender] || node.data.gender}`;
+      body.appendChild(gender);
+    }
+    if (node.data.web) {
+      const web = createEl('div', 'inspector-subtitle');
+      web.textContent = node.data.web;
+      body.appendChild(web);
+    }
+    if (node.data.description) {
+      const sec = createEl('div', 'inspector-section');
+      const title = createEl('div', 'inspector-section-title');
+      title.textContent = 'Description';
+      const description = createEl('div', 'inspector-notes');
+      description.textContent = node.data.description;
+      sec.appendChild(title);
+      sec.appendChild(description);
+      body.appendChild(sec);
+    }
     if (node.data.notes) {
       const sec = createEl('div', 'inspector-section');
       const title = createEl('div', 'inspector-section-title');
@@ -166,6 +193,10 @@ function renderInspector(nodeId) {
       sec.appendChild(notes);
       body.appendChild(sec);
     }
+  }
+
+  if (node.entityType === 'person' || isOrganizationEntityType(node.entityType)) {
+    renderAttributes(node.entityType === 'person' ? 'person' : 'organization', node.id, body);
   }
 
   const nodeLinks = graph.getNodeLinks(nodeId);
@@ -201,7 +232,69 @@ function renderInspector(nodeId) {
   editBtn.textContent = 'Edit';
   editBtn.addEventListener('click', () => openEditModal(nodeId));
   actions.appendChild(editBtn);
+
+  if (node.entityType === 'person' || isOrganizationEntityType(node.entityType)) {
+    const attrBtn = createEl('button', 'btn btn-ghost');
+    attrBtn.textContent = 'Add attribute';
+    attrBtn.addEventListener('click', () => openAttributeModal(nodeId));
+    actions.appendChild(attrBtn);
+  }
+
   body.appendChild(actions);
+}
+
+async function renderAttributes(ownerType, ownerId, body) {
+  const sec = createEl('div', 'inspector-section');
+  const title = createEl('div', 'inspector-section-title');
+  title.textContent = 'Attributes';
+  const list = createEl('div', 'inspector-attribute-list');
+  list.textContent = 'Loading...';
+  sec.appendChild(title);
+  sec.appendChild(list);
+  body.appendChild(sec);
+
+  try {
+    const attributes = await apiListAttributes(ownerType, ownerId);
+    clearChildren(list);
+    if (!attributes.length) {
+      list.textContent = 'No attributes yet.';
+      return;
+    }
+    attributes.forEach(attribute => {
+      list.appendChild(buildAttributeItem(attribute));
+    });
+  } catch (err) {
+    list.textContent = 'Could not load attributes.';
+    console.error('Attribute load failed:', err);
+  }
+}
+
+function buildAttributeItem(attribute) {
+  const item = createEl('div', 'inspector-attribute-item');
+  const type = createEl('div', 'inspector-attribute-type');
+  type.textContent = ATTRIBUTE_LABELS[attribute.type] || attribute.type;
+  const value = createEl('div', 'inspector-attribute-value');
+  value.textContent = attribute.value;
+  item.appendChild(type);
+  item.appendChild(value);
+
+  const metaParts = [];
+  if (attribute.start_date) metaParts.push(attribute.start_date);
+  if (attribute.end_date) metaParts.push(attribute.end_date);
+  if (attribute.current) metaParts.push('current');
+  if (metaParts.length) {
+    const meta = createEl('div', 'inspector-attribute-meta');
+    meta.textContent = metaParts.join(' - ');
+    item.appendChild(meta);
+  }
+
+  if (attribute.notes) {
+    const notes = createEl('div', 'inspector-notes');
+    notes.textContent = attribute.notes;
+    item.appendChild(notes);
+  }
+
+  return item;
 }
 
 // ---- Node creation modal ----
@@ -210,15 +303,79 @@ const FORM_FIELDS = {
   person: [
     { key: 'name',     label: 'Full name',       type: 'text',     required: true },
     { key: 'nickname', label: 'Nickname',         type: 'text'  },
+    { key: 'gender',   label: 'Gender',           type: 'select',   options: [
+      { value: '',  label: 'Unspecified' },
+      { value: 'm', label: 'Male' },
+      { value: 'f', label: 'Female' },
+      { value: 'o', label: 'Other' },
+    ] },
     { key: 'title',    label: 'Title / Role',     type: 'text'  },
     { key: 'notes',    label: 'Notes',            type: 'textarea' },
     { key: 'deceased', label: 'Deceased / Legacy', type: 'checkbox' },
   ],
-  company:     [{ key: 'name', label: 'Company name',     type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  association: [{ key: 'name', label: 'Association name', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  school:      [{ key: 'name', label: 'School name',      type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  company: [
+    { key: 'name', label: 'Company name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
+  association: [
+    { key: 'name', label: 'Association name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
+  school: [
+    { key: 'name', label: 'School name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
   location:    [{ key: 'name', label: 'Location name',    type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
   tag:         [{ key: 'name', label: 'Tag name',         type: 'text', required: true }],
+};
+
+const GENDER_LABELS = {
+  m: 'Male',
+  f: 'Female',
+  o: 'Other',
+};
+
+const ATTRIBUTE_LABELS = {
+  title: 'Title',
+  role: 'Role',
+  employment: 'Employment',
+  education: 'Education',
+  certification: 'Certification',
+  award: 'Award',
+  board_membership: 'Board membership',
+  board_role: 'Board role',
+  membership: 'Membership',
+  milestone: 'Milestone',
+  competition: 'Competition',
+  achievement: 'Achievement',
+};
+
+const ATTRIBUTE_TYPES = {
+  person: [
+    ['title', 'Title'],
+    ['role', 'Role'],
+    ['employment', 'Employment'],
+    ['education', 'Education'],
+    ['certification', 'Certification'],
+    ['award', 'Award'],
+    ['board_membership', 'Board membership'],
+    ['competition', 'Competition'],
+    ['achievement', 'Achievement'],
+  ],
+  organization: [
+    ['role', 'Role'],
+    ['membership', 'Membership'],
+    ['board_role', 'Board role'],
+    ['certification', 'Certification'],
+    ['award', 'Award'],
+    ['milestone', 'Milestone'],
+  ],
 };
 
 function initModals() {
@@ -270,6 +427,14 @@ function buildModalForm(entityType, data) {
     if (field.type === 'textarea') {
       input = createEl('textarea', 'form-input');
       input.rows = 3;
+    } else if (field.type === 'select') {
+      input = createEl('select', 'form-select');
+      (field.options || []).forEach(option => {
+        const opt = createEl('option', '');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        input.appendChild(opt);
+      });
     } else if (field.type === 'checkbox') {
       const wrap = createEl('label', 'form-check');
       input = createEl('input', '');
@@ -395,6 +560,91 @@ function closeModal() {
   el('modal-overlay').classList.add('modal-hidden');
   modalEntityType = null;
   modalEntityId = null;
+}
+
+// ---- Attribute modal ----
+
+function initAttributeModal() {
+  el('attribute-modal-close').addEventListener('click', closeAttributeModal);
+  el('attribute-modal-cancel').addEventListener('click', closeAttributeModal);
+  el('attribute-modal-overlay').addEventListener('click', (e) => {
+    if (e.target === el('attribute-modal-overlay')) closeAttributeModal();
+  });
+  el('attribute-modal-save').addEventListener('click', handleAttributeSave);
+}
+
+function openAttributeModal(nodeId) {
+  const node = graph.getNode(nodeId);
+  if (!node) return;
+  attributeOwnerType = node.entityType === 'person' ? 'person' : 'organization';
+  attributeOwnerId = nodeId;
+  el('attribute-form').reset();
+  configureAttributeModal(attributeOwnerType);
+  el('attribute-modal-overlay').classList.remove('modal-hidden');
+  el('attribute-value').focus();
+}
+
+function configureAttributeModal(ownerType) {
+  const select = el('attribute-type');
+  clearChildren(select);
+  (ATTRIBUTE_TYPES[ownerType] || []).forEach(([value, label]) => {
+    const option = createEl('option', '');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+
+  const relatedLabel = el('attribute-related-label');
+  relatedLabel.textContent = ownerType === 'person' ? 'Organization ID' : 'Person ID';
+}
+
+function closeAttributeModal() {
+  el('attribute-modal-overlay').classList.add('modal-hidden');
+  attributeOwnerType = null;
+  attributeOwnerId = null;
+}
+
+async function handleAttributeSave() {
+  if (!attributeOwnerType || !attributeOwnerId) return;
+
+  const value = el('attribute-value').value.trim();
+  if (!value) {
+    el('attribute-value').focus();
+    el('attribute-value').style.borderColor = 'var(--error)';
+    setTimeout(() => { el('attribute-value').style.borderColor = ''; }, 1200);
+    return;
+  }
+
+  const data = {
+    type: el('attribute-type').value,
+    value,
+    start_date: el('attribute-start').value.trim(),
+    end_date: el('attribute-end').value.trim(),
+    current: el('attribute-current').checked,
+    notes: el('attribute-notes').value.trim(),
+  };
+  const relatedId = el('attribute-related').value.trim();
+  if (attributeOwnerType === 'person') {
+    data.organization_id = relatedId;
+  } else {
+    data.person_id = relatedId;
+  }
+
+  el('attribute-modal-save').disabled = true;
+  el('attribute-modal-save').textContent = 'Saving...';
+
+  try {
+    await apiCreateAttribute(attributeOwnerType, attributeOwnerId, data);
+    const nodeId = attributeOwnerId;
+    closeAttributeModal();
+    renderInspector(nodeId);
+  } catch (err) {
+    console.error('Attribute save failed:', err);
+    alert('Could not save attribute.');
+  } finally {
+    el('attribute-modal-save').disabled = false;
+    el('attribute-modal-save').textContent = 'Save';
+  }
 }
 
 // ---- Link modal ----

@@ -508,10 +508,10 @@ Documentation checklist:
 0.7 Development
 
 Goal:
-Add real backend API structure and temporary storage.
+Add real backend API structure and Neo4j-backed storage.
 
 Scope:
-Backend becomes useful without Neo4j. Temporary in-memory storage can be used for fast iteration.
+Backend becomes useful with real graph persistence. Neo4j is introduced in this version so API, storage, and frontend integration can be developed against the target graph database from the start. A small in-memory storage may still exist for tests, but Neo4j is the primary runtime storage.
 
 Implementation checklist:
 
@@ -602,7 +602,29 @@ Implementation checklist:
   * studied_at
   * lives_in
   * has_tag
-* Add in-memory storage implementation.
+* Add Neo4j dependency.
+* Add Neo4j configuration fields:
+
+  * URI
+  * username
+  * password
+  * database name if needed
+* Add Neo4j storage implementation under internal/storage/neo4j or similar.
+* Keep storage.Storage interface as the boundary.
+* Implement Neo4j connection lifecycle.
+* Implement Close method.
+* Create constraints or indexes for key node IDs.
+* Store Account nodes.
+* Store Session or session metadata if sessions are persisted.
+* Store Role information on accounts.
+* Store Person nodes.
+* Store Person profile attributes as nodes or structured related data.
+* Store Organization nodes.
+* Store Organization profile attributes as nodes or structured related data.
+* Store Location nodes if used.
+* Store Tag nodes if used.
+* Store Relationship edges.
+* Add in-memory storage implementation only if useful for isolated tests.
 * Ensure handlers call services.
 * Ensure services call storage.
 * Ensure handlers do not contain storage logic.
@@ -692,22 +714,27 @@ Implementation checklist:
 
 Acceptance criteria:
 
-* Persons can be created through API.
-* Persons can be listed through API.
-* Organizations can be created through API.
-* Organizations can be listed through API.
-* Relationships can be created through API.
-* Graph endpoint returns nodes and links.
+* MATE can connect to Neo4j.
+* Persons can be created through API and stored in Neo4j.
+* Persons can be listed through API from Neo4j.
+* Organizations can be created through API and stored in Neo4j.
+* Organizations can be listed through API from Neo4j.
+* Relationships can be created through API and stored as graph edges.
+* Graph endpoint returns nodes and links from Neo4j.
 * Frontend can fetch graph data from backend.
-* First owner account can be bootstrapped in temporary storage.
-* Login, logout, and current-user endpoints work with temporary sessions.
+* First owner account can be bootstrapped and stored in Neo4j.
+* Login, logout, and current-user endpoints work with persisted accounts.
 * Owner can create at least one additional account with a role.
-* Person profile view can show person details and attributes.
-* Organization profile view can show organization details and attributes.
-* Data may reset on server restart in this version.
+* Person profile view can show person details and attributes from Neo4j.
+* Organization profile view can show organization details and attributes from Neo4j.
+* Data survives server restart.
 
 Test checklist:
 
+* Start Neo4j.
+* Test Neo4j configuration loading.
+* Test Neo4j unavailable behavior.
+* Test wrong Neo4j password behavior.
 * Test GET /api/v1/setup/status.
 * Test POST /api/v1/setup/owner.
 * Test POST /api/v1/auth/login.
@@ -729,6 +756,7 @@ Test checklist:
 * Test unknown IDs.
 * Test frontend graph load from backend.
 * Test profile page with known test person.
+* Restart MATE and confirm account, person, organization, relationship, and profile attribute data remain.
 * Run go test ./...
 
 Documentation checklist:
@@ -740,15 +768,18 @@ Documentation checklist:
 * docs/api.md documents person and organization profile endpoints.
 * docs/api.md documents attribute types and time-bound fields.
 * roadmap.txt updated with any new entities.
-* Add note that storage is temporary in this version.
+* Add docs/configuration.md.
+* Add docs/storage.md.
+* Add docs/neo4j.md.
+* Document Neo4j setup and expected local development configuration.
 
 0.8 Debug
 
 Goal:
-Stabilize API, services, frontend integration, and in-memory behavior.
+Stabilize API, services, frontend integration, and Neo4j-backed behavior.
 
 Scope:
-No Neo4j requirement yet. This is a full pre-database debug version.
+This is a full debug version for the API and graph persistence introduced in 0.7. Focus on validation, storage behavior, authorization, and frontend resilience.
 
 Implementation checklist:
 
@@ -777,7 +808,7 @@ Implementation checklist:
 * Add storage tests.
 * Review frontend API error handling.
 * Review privacy risk of exposing all graph data.
-* Stabilize temporary authentication and session behavior.
+* Stabilize persisted authentication and session behavior.
 * Stabilize role based authorization rules for owner, admin, editor, and viewer.
 * Confirm unauthorized requests are rejected consistently.
 * Confirm profile page handles missing data gracefully.
@@ -787,12 +818,13 @@ Acceptance criteria:
 
 * All documented endpoints behave consistently.
 * Invalid requests produce predictable errors.
-* Login and logout behave consistently in temporary storage.
+* Login and logout behave consistently with persisted accounts.
 * Role restricted endpoints reject users without permission.
 * Frontend does not crash on API errors.
 * API documentation matches behavior.
 * Basic tests exist for handlers, services, and storage.
-* In-memory storage is reliable enough for development.
+* Neo4j storage is reliable enough for development.
+* Optional in-memory test storage remains aligned with the storage interface if it exists.
 
 Test checklist:
 
@@ -815,56 +847,30 @@ Test checklist:
 * Test graph endpoint with sample data.
 * Test frontend when backend returns empty graph.
 * Test frontend when backend returns error.
+* Restart MATE and verify persisted Neo4j data remains available.
+* Test Neo4j unavailable and credential failure behavior.
 
 Documentation checklist:
 
 * docs/api.md updated.
 * Add test checklist to docs or roadmap.
 * Document current known security limitations.
-* Document temporary authentication limitations before Neo4j persistence.
+* Document authentication limitations before full beta hardening.
 * Document role permissions.
 
 0.9 Beta
 
 Goal:
-Connect MATE to Neo4j and use real graph storage.
+Harden the Neo4j-backed application into a local beta.
 
 Scope:
-Replace or complement in-memory storage with Neo4j-backed storage. MATE becomes usable as a local beta.
+Neo4j storage already exists from 0.7. This version turns the system into a usable beta by hardening account flows, edit flows, archive behavior, import/export planning, backup documentation, and private data handling.
 
 Implementation checklist:
 
-* Add Neo4j dependency.
-* Add Neo4j configuration fields:
-
-  * URI
-  * username
-  * password
-  * database name if needed
-* Add Neo4j storage implementation under internal/storage/neo4j or similar.
-* Keep storage.Storage interface as the boundary.
-* Implement Neo4j connection lifecycle.
-* Implement Close method.
-* Create constraints or indexes for key node IDs.
-* Store Account nodes.
-* Store Session or session metadata if sessions are persisted.
-* Store Role information on accounts.
-* Store Person nodes.
-* Store Person profile attributes as nodes or structured related data.
-* Store Organization nodes.
-* Store Organization profile attributes as nodes or structured related data.
-* Store Location nodes if used.
-* Store Tag nodes if used.
-* Store Relationship edges.
-* Implement create/read/list/update for accounts.
-* Implement login, logout, and current-user behavior with persisted accounts.
-* Implement create/read/list/update for persons.
-* Implement person profile and person attribute queries.
-* Implement create/read/list/update for organizations.
-* Implement organization profile and organization attribute queries.
-* Implement create/read/list for relationships.
-* Implement graph query for frontend.
-* Decide node labels:
+* Review Neo4j schema, constraints, indexes, and query performance.
+* Review storage.Storage interface after real Neo4j usage.
+* Finalize node labels:
 
   * Person
   * Organization
@@ -875,7 +881,7 @@ Implementation checklist:
   * Tag
 * Decide whether Company, Association, and School are separate labels or organization subtypes.
 * Add login page.
-* Add owner bootstrap flow.
+* Add owner bootstrap flow UI.
 * Add account management view for owner.
 * Add basic edit forms.
 * Add update person.
@@ -894,13 +900,14 @@ Implementation checklist:
 
 Acceptance criteria:
 
-* MATE can store data in Neo4j.
+* MATE is usable as a local beta with Neo4j-backed data.
 * Account, role, profile, attribute, and graph data survive server restart.
-* Existing API endpoints work with Neo4j storage.
+* Existing API endpoints are stable enough for beta use.
 * Login works with persisted accounts.
 * Owner can create and manage other accounts.
 * Frontend graph loads real data from Neo4j.
 * Person profile page loads real data.
+* Organization profile page loads real data.
 * Basic create and edit flows work.
 * Delete/archive behavior is defined.
 * Backup/export is documented.
@@ -912,28 +919,28 @@ Test checklist:
 * Bootstrap owner account.
 * Log in as owner.
 * Create another account with a non-owner role.
-* Create person through API.
+* Create person through API and UI.
 * Add person profile attributes.
-* Restart MATE.
-* Confirm account, person, and attributes remain.
-* Create organization.
+* Create organization through API and UI.
+* Add organization profile attributes.
 * Create relationship.
+* Restart MATE.
+* Confirm account, person, organization, relationship, and attributes remain.
 * Confirm graph endpoint returns real graph.
 * Confirm frontend renders real graph.
 * Test profile page for real person.
-* Test Neo4j unavailable behavior.
-* Test wrong Neo4j password behavior.
+* Test profile page for real organization.
 * Run go test ./...
 * Run manual end to end test.
 
 Documentation checklist:
 
-* docs/api.md updated for Neo4j-backed behavior.
-* Add docs/configuration.md.
-* Add docs/accounts.md.
-* Add docs/profile-model.md.
-* Add docs/storage.md.
-* Add docs/neo4j.md.
+* docs/api.md updated for beta behavior.
+* docs/configuration.md updated.
+* docs/accounts.md updated.
+* docs/profile-model.md updated.
+* docs/storage.md updated.
+* docs/neo4j.md updated.
 * Add backup/export documentation.
 * Add privacy warning for local personal data.
 

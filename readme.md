@@ -16,5 +16,6 @@ Configuration:
 
 - Create a local `.mate.ini` or `mate.ini` file to override the default settings.
 - The default server address is `0.0.0.0:8325`, which listens on all network interfaces.
+- Neo4j must be running for the 0.7 backend API.
 - Keep credentials private; `.mate.ini` is included in `.gitignore`.
 - Run the server with `go run ./cmd/mate`.
