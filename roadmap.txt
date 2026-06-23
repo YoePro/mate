@@ -22,6 +22,8 @@ Primary design principles:
 
 * Local first
 * Private by default
+* Login required for normal use once account support exists
+* Role based access from the start of account support
 * Simple Go backend
 * Vanilla HTML, CSS, and JavaScript frontend
 * Neo4j as graph storage
@@ -58,6 +60,35 @@ Each version contains:
 
 Do not place actual code in this file.
 This file should describe what must exist, when it is considered done, and how it should be tested.
+
+Access and account model:
+
+MATE should support login before the first stable release. The practical model should stay simple:
+
+* The first local account is created through a controlled bootstrap flow.
+* The first account receives the owner role.
+* The owner can create and manage other accounts.
+* Roles should be explicit and small:
+
+  * owner: full access, account management, configuration level operations.
+  * admin: manage MATE data and invite or manage non-owner accounts if allowed by owner.
+  * editor: create, update, and archive relationship data.
+  * viewer: read-only access.
+* Sessions should use secure HTTP-only cookies.
+* Passwords must never be stored in plain text.
+* Authentication and authorization must be enforced in services or middleware, not scattered through handlers.
+* Single-user local use should remain easy, but not rely on an unauthenticated application once accounts exist.
+
+Profile and attribute model:
+
+MATE should treat people and organizations as rich profiles, not only graph nodes.
+
+* A Person profile should support stable core fields such as name, nickname, gender, date fields where useful, deceased or legacy status, description, notes, and tags.
+* A Person profile should support time-bound attributes such as titles, roles, education, certifications, awards, memberships, board roles, employment, competitions, and achievements.
+* An Organization profile should support name, type, description, notes, tags, locations, contact or web references, aliases, active status, and time-bound roles or memberships.
+* Time-bound attributes should support start date, end date, current status, source or notes, and optional relationship to an organization.
+* Profiles should show direct relationships, related organizations, timeline-like attribute history, and graph context.
+* The exact data model can evolve, but the API should not force everything into a single notes field.
 
 0.1 Development
 
@@ -487,25 +518,60 @@ Implementation checklist:
 * Define API endpoint behavior in docs/api.md.
 * Add handlers for:
 
+  * auth
+  * accounts
   * persons
+  * person profiles
+  * person attributes
   * organizations
+  * organization profiles
+  * organization attributes
   * relationships
   * graph
 * Add service methods for:
 
+  * get setup status
+  * bootstrap first owner account
+  * login
+  * logout
+  * get current session user
+  * create account
+  * list accounts
+  * update account role
+  * disable account
   * create person
   * list persons
   * get person
+  * update person
+  * get person profile
+  * add person attribute
+  * update person attribute
+  * archive person attribute
   * create organization
   * list organizations
   * get organization
+  * update organization
+  * get organization profile
+  * add organization attribute
+  * update organization attribute
+  * archive organization attribute
   * create relationship
   * list relationships
+  * get relationship
+  * delete relationship
   * get graph
+  * search graph data
 * Define models for:
 
+  * Account
+  * Role
+  * Session
   * Person
+  * PersonProfile
+  * PersonAttribute
   * Organization
+  * OrganizationProfile
+  * OrganizationAttribute
   * Relationship
   * GraphNode
   * GraphLink
@@ -519,6 +585,12 @@ Implementation checklist:
 
   * location
   * tag
+* Define account roles:
+
+  * owner
+  * admin
+  * editor
+  * viewer
 * Define relationship types:
 
   * knows
@@ -541,8 +613,8 @@ Implementation checklist:
 
   * name
   * nickname
-  * title or primary role
-  * CEO / Board member / award / competition notes
+  * gender
+  * description
   * notes
   * tags
   * organizations
@@ -550,7 +622,73 @@ Implementation checklist:
   * friend relations
   * deceased or legacy status
   * activity placeholder
+* Add person time-bound attributes including:
+
+  * title
+  * role
+  * employment
+  * education
+  * certification
+  * award
+  * board membership
+  * competition
+  * achievement
+* Add organization metadata support including:
+
+  * name
+  * type
+  * description
+  * notes
+  * tags
+  * aliases
+  * locations
+  * active status
+  * web or contact references
+* Add organization time-bound attributes including:
+
+  * role
+  * membership
+  * board role
+  * certification
+  * award
+  * milestone
 * Add API connection through web/static/js/api.js.
+* Define endpoint contract for:
+
+  * GET /api/v1/setup/status
+  * POST /api/v1/setup/owner
+  * POST /api/v1/auth/login
+  * POST /api/v1/auth/logout
+  * GET /api/v1/auth/me
+  * GET /api/v1/accounts
+  * POST /api/v1/accounts
+  * GET /api/v1/accounts/{id}
+  * PATCH /api/v1/accounts/{id}
+  * POST /api/v1/accounts/{id}/disable
+  * GET /api/v1/persons
+  * POST /api/v1/persons
+  * GET /api/v1/persons/{id}
+  * PUT /api/v1/persons/{id}
+  * GET /api/v1/persons/{id}/profile
+  * GET /api/v1/persons/{id}/attributes
+  * POST /api/v1/persons/{id}/attributes
+  * PUT /api/v1/persons/{id}/attributes/{attributeId}
+  * POST /api/v1/persons/{id}/attributes/{attributeId}/archive
+  * GET /api/v1/organizations
+  * POST /api/v1/organizations
+  * GET /api/v1/organizations/{id}
+  * PUT /api/v1/organizations/{id}
+  * GET /api/v1/organizations/{id}/profile
+  * GET /api/v1/organizations/{id}/attributes
+  * POST /api/v1/organizations/{id}/attributes
+  * PUT /api/v1/organizations/{id}/attributes/{attributeId}
+  * POST /api/v1/organizations/{id}/attributes/{attributeId}/archive
+  * GET /api/v1/relationships
+  * POST /api/v1/relationships
+  * GET /api/v1/relationships/{id}
+  * DELETE /api/v1/relationships/{id}
+  * GET /api/v1/graph
+  * GET /api/v1/search
 
 Acceptance criteria:
 
@@ -561,16 +699,30 @@ Acceptance criteria:
 * Relationships can be created through API.
 * Graph endpoint returns nodes and links.
 * Frontend can fetch graph data from backend.
-* Person profile view can show person details.
+* First owner account can be bootstrapped in temporary storage.
+* Login, logout, and current-user endpoints work with temporary sessions.
+* Owner can create at least one additional account with a role.
+* Person profile view can show person details and attributes.
+* Organization profile view can show organization details and attributes.
 * Data may reset on server restart in this version.
 
 Test checklist:
 
+* Test GET /api/v1/setup/status.
+* Test POST /api/v1/setup/owner.
+* Test POST /api/v1/auth/login.
+* Test POST /api/v1/auth/logout.
+* Test GET /api/v1/auth/me.
+* Test account creation and role assignment.
 * Test POST /api/v1/persons.
 * Test GET /api/v1/persons.
 * Test POST /api/v1/organizations.
 * Test GET /api/v1/organizations.
 * Test POST /api/v1/relationships.
+* Test person profile endpoints.
+* Test person attribute endpoints.
+* Test organization profile endpoints.
+* Test organization attribute endpoints.
 * Test GET /api/v1/graph.
 * Test invalid JSON.
 * Test missing required fields.
@@ -584,6 +736,9 @@ Documentation checklist:
 * docs/api.md contains request and response examples.
 * docs/api.md documents error format.
 * docs/api.md documents relationship types.
+* docs/api.md documents account roles and auth endpoints.
+* docs/api.md documents person and organization profile endpoints.
+* docs/api.md documents attribute types and time-bound fields.
 * roadmap.txt updated with any new entities.
 * Add note that storage is temporary in this version.
 
@@ -612,6 +767,9 @@ Implementation checklist:
 * Decide whether IDs are created server side.
 * Normalize organization type validation.
 * Normalize relationship type validation.
+* Normalize role validation.
+* Normalize profile and attribute type validation.
+* Validate time-bound attributes with start date, end date, current status, source, and notes rules.
 * Add service level validation.
 * Add storage level tests.
 * Add handler tests.
@@ -619,13 +777,18 @@ Implementation checklist:
 * Add storage tests.
 * Review frontend API error handling.
 * Review privacy risk of exposing all graph data.
-* Add clear placeholder for future authentication.
+* Stabilize temporary authentication and session behavior.
+* Stabilize role based authorization rules for owner, admin, editor, and viewer.
+* Confirm unauthorized requests are rejected consistently.
 * Confirm profile page handles missing data gracefully.
+* Confirm person and organization attribute history renders predictably.
 
 Acceptance criteria:
 
 * All documented endpoints behave consistently.
 * Invalid requests produce predictable errors.
+* Login and logout behave consistently in temporary storage.
+* Role restricted endpoints reject users without permission.
 * Frontend does not crash on API errors.
 * API documentation matches behavior.
 * Basic tests exist for handlers, services, and storage.
@@ -640,6 +803,12 @@ Test checklist:
 * Test missing required fields.
 * Test invalid relationship type.
 * Test invalid organization type.
+* Test invalid account role.
+* Test unauthorized access to account management.
+* Test viewer cannot create or edit data.
+* Test editor cannot manage accounts.
+* Test invalid profile attribute type.
+* Test invalid profile attribute dates.
 * Test unknown person ID.
 * Test unknown organization ID.
 * Test graph endpoint with empty data.
@@ -652,7 +821,8 @@ Documentation checklist:
 * docs/api.md updated.
 * Add test checklist to docs or roadmap.
 * Document current known security limitations.
-* Document that authentication is not yet implemented.
+* Document temporary authentication limitations before Neo4j persistence.
+* Document role permissions.
 
 0.9 Beta
 
@@ -676,13 +846,22 @@ Implementation checklist:
 * Implement Neo4j connection lifecycle.
 * Implement Close method.
 * Create constraints or indexes for key node IDs.
+* Store Account nodes.
+* Store Session or session metadata if sessions are persisted.
+* Store Role information on accounts.
 * Store Person nodes.
+* Store Person profile attributes as nodes or structured related data.
 * Store Organization nodes.
+* Store Organization profile attributes as nodes or structured related data.
 * Store Location nodes if used.
 * Store Tag nodes if used.
 * Store Relationship edges.
-* Implement create/read/list for persons.
-* Implement create/read/list for organizations.
+* Implement create/read/list/update for accounts.
+* Implement login, logout, and current-user behavior with persisted accounts.
+* Implement create/read/list/update for persons.
+* Implement person profile and person attribute queries.
+* Implement create/read/list/update for organizations.
+* Implement organization profile and organization attribute queries.
 * Implement create/read/list for relationships.
 * Implement graph query for frontend.
 * Decide node labels:
@@ -695,9 +874,16 @@ Implementation checklist:
   * Location
   * Tag
 * Decide whether Company, Association, and School are separate labels or organization subtypes.
+* Add login page.
+* Add owner bootstrap flow.
+* Add account management view for owner.
 * Add basic edit forms.
 * Add update person.
+* Add update person profile fields.
+* Add add/edit/archive person attributes.
 * Add update organization.
+* Add update organization profile fields.
+* Add add/edit/archive organization attributes.
 * Add update relationship.
 * Add delete or archive strategy.
 * Prefer archive/soft delete for personal data unless explicitly removed.
@@ -709,8 +895,10 @@ Implementation checklist:
 Acceptance criteria:
 
 * MATE can store data in Neo4j.
-* Data survives server restart.
+* Account, role, profile, attribute, and graph data survive server restart.
 * Existing API endpoints work with Neo4j storage.
+* Login works with persisted accounts.
+* Owner can create and manage other accounts.
 * Frontend graph loads real data from Neo4j.
 * Person profile page loads real data.
 * Basic create and edit flows work.
@@ -721,9 +909,13 @@ Test checklist:
 
 * Start Neo4j.
 * Start MATE.
+* Bootstrap owner account.
+* Log in as owner.
+* Create another account with a non-owner role.
 * Create person through API.
+* Add person profile attributes.
 * Restart MATE.
-* Confirm person remains.
+* Confirm account, person, and attributes remain.
 * Create organization.
 * Create relationship.
 * Confirm graph endpoint returns real graph.
@@ -738,6 +930,8 @@ Documentation checklist:
 
 * docs/api.md updated for Neo4j-backed behavior.
 * Add docs/configuration.md.
+* Add docs/accounts.md.
+* Add docs/profile-model.md.
 * Add docs/storage.md.
 * Add docs/neo4j.md.
 * Add backup/export documentation.
@@ -755,8 +949,15 @@ Implementation checklist:
 
 * Finalize core models:
 
+  * Account
+  * Role
+  * Session
   * Person
+  * PersonProfile
+  * PersonAttribute
   * Organization
+  * OrganizationProfile
+  * OrganizationAttribute
   * Relationship
   * Location
   * Tag
@@ -780,9 +981,15 @@ Implementation checklist:
 * Finalize vanilla frontend structure.
 * Finalize Neo4j storage.
 * Finalize graph UI.
+* Finalize login, logout, session, and owner bootstrap flows.
+* Finalize role based permissions for owner, admin, editor, and viewer.
+* Finalize account management for owner.
 * Finalize person profile page.
+* Finalize organization profile page.
 * Finalize basic create/edit/view flows.
-* Finalize person metadata support for titles, achievements, board-level roles, and deceased/legacy markers.
+* Finalize person metadata support for gender, description, tags, titles, education, certifications, achievements, board-level roles, competitions, and deceased/legacy markers.
+* Finalize organization metadata support for descriptions, tags, locations, aliases, active status, roles, memberships, milestones, awards, and certifications.
+* Finalize time-bound attribute behavior for people and organizations.
 * Finalize API documentation.
 * Finalize configuration documentation.
 * Finalize backup/export documentation.
@@ -793,6 +1000,10 @@ Implementation checklist:
 
 Acceptance criteria:
 
+* User must log in to use MATE after accounts are configured.
+* First local owner account can be created through bootstrap.
+* Owner can create, update, and disable other accounts.
+* Role permissions are enforced consistently.
 * User can create and view persons.
 * User can create and view companies.
 * User can create and view associations.
@@ -800,7 +1011,9 @@ Acceptance criteria:
 * User can create and view relationships.
 * User can view a graph of relationships.
 * User can open a person profile.
+* User can open an organization profile.
 * User can see relevant relationships on profile page.
+* User can see time-bound titles, education, certifications, roles, memberships, awards, and achievements on profile pages.
 * Data persists in Neo4j.
 * Application can be started reliably.
 * Documentation is sufficient to install, start, and use locally.
@@ -812,15 +1025,24 @@ Test checklist:
 
   * start MATE
   * open browser
+  * bootstrap owner if needed
+  * log in
+  * create secondary account
+  * verify role restrictions
   * create person
+  * add person profile attributes
   * create organization
+  * add organization profile attributes
   * create relationship
   * view graph
-  * open profile
+  * open person profile
+  * open organization profile
   * restart application
   * confirm data persists
 * Test empty database.
 * Test sample database.
+* Test login and logout.
+* Test account role permissions.
 * Test invalid API input.
 * Test frontend with API failure.
 * Test browser reload.
@@ -831,22 +1053,24 @@ Documentation checklist:
 * roadmap.txt updated.
 * docs/api.md complete for 1.0.
 * docs/configuration.md complete.
+* docs/accounts.md complete.
+* docs/profile-model.md complete.
 * docs/storage.md complete.
 * docs/neo4j.md complete.
 * README.md exists in project root.
 * README.md explains how to start MATE.
 * README.md explains project purpose.
 * README.md explains privacy assumptions.
+* README.md explains first owner account setup.
 
 Future 1.x
 
 1.1 Development
 
-* Add authentication.
-* Add login page.
-* Add session handling.
-* Add protected routes.
-* Add user profile or owner profile.
+* Improve account management workflows.
+* Add password change flow.
+* Add account recovery or reset strategy for local owner account.
+* Add optional user profile or owner profile.
 * Add improved config loading.
 * Add environment variable support.
 * Add optional config file support if needed.
@@ -860,11 +1084,11 @@ Future 1.x
 
 1.2 Release
 
-* Stabilize authentication.
+* Stabilize account management improvements.
 * Stabilize search.
 * Stabilize filtering.
 * Stabilize timeline.
-* Add tests for authentication.
+* Add tests for account management improvements.
 * Add tests for search.
 * Add tests for filtering.
 * Update documentation.
