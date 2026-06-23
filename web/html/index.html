@@ -15,7 +15,15 @@
 </head>
 <body>
 
-<!-- Login screen (shown until authenticated) -->
+<script>
+window.MATE_CONFIG = {
+  supabaseUrl: '%VITE_SUPABASE_URL%',
+  supabaseKey: '%VITE_SUPABASE_ANON_KEY%'
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<!-- Login screen -->
 <div id="login-screen">
   <div class="login-card">
     <div class="login-brand">
@@ -30,25 +38,27 @@
         <line x1="6" y1="17" x2="10" y2="13"/>
         <line x1="18" y1="17" x2="14" y2="13"/>
       </svg>
-      <div class="login-title">MATE</div>
-      <div class="login-subtitle">Memories · Alliances · Time · Engagement</div>
+      <div class="login-brand-name">MATE</div>
+      <div class="login-brand-sub">Memories · Alliances · Time · Engagement</div>
     </div>
     <div class="login-tabs">
       <button class="login-tab active" data-tab="signin">Sign in</button>
       <button class="login-tab" data-tab="signup">Create account</button>
     </div>
-    <div class="form-group">
-      <label class="form-label" for="auth-email">Email</label>
-      <input id="auth-email" class="form-input" type="email" placeholder="you@example.com" autocomplete="email" />
+    <div class="login-fields">
+      <div class="form-group">
+        <label class="form-label" for="auth-email">Email</label>
+        <input id="auth-email" type="email" class="form-input" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="auth-password">Password</label>
+        <input id="auth-password" type="password" class="form-input" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="auth-message" class="auth-message"></div>
+      <button id="auth-submit" class="btn btn-primary login-submit">Sign in</button>
     </div>
-    <div class="form-group">
-      <label class="form-label" for="auth-password">Password</label>
-      <input id="auth-password" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password" />
-    </div>
-    <div id="auth-message" class="auth-message"></div>
-    <button id="auth-submit" class="btn btn-primary btn-full">Sign in</button>
-    <div class="auth-footer">
-      Your private relationship network.<br>Data is only visible to you.
+    <div class="login-footer">
+      Secure access to your personal relationship network
     </div>
   </div>
 </div>
@@ -72,9 +82,7 @@
       <span class="brand-name">MATE</span>
       <span class="brand-tagline">Memories · Alliances · Time · Engagement</span>
     </div>
-
-    <!-- Graph view controls -->
-    <div class="header-center header-graph-area">
+    <div class="header-center">
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -82,25 +90,13 @@
         <input id="search-input" type="text" placeholder="Search people, places, tags..." autocomplete="off" />
       </div>
     </div>
-
-    <!-- Profile view controls -->
-    <div class="header-profile-area">
-      <button id="btn-back-graph" class="btn btn-ghost header-graph-btn" title="Back to graph">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        Graph
-      </button>
-      <div class="profile-header-name" id="profile-header-name"></div>
-    </div>
-
     <div class="header-actions">
-      <button id="btn-fit" class="btn-icon header-graph-btn" title="Fit graph to view">
+      <button id="btn-fit" class="btn-icon" title="Fit graph to view">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
         </svg>
       </button>
-      <button id="btn-reload" class="btn-icon header-graph-btn" title="Reload graph">
+      <button id="btn-reload" class="btn-icon" title="Reload graph">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="23 4 23 10 17 10"/>
           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -114,7 +110,7 @@
     </div>
   </header>
 
-  <!-- Main graph area -->
+  <!-- Main area -->
   <div id="main">
 
     <!-- Left toolbox -->
@@ -198,43 +194,48 @@
 
   </div>
 
-  <!-- Profile view -->
-  <div id="profile-view" class="view-hidden">
-    <div id="profile-content">
-      <div id="profile-left">
-        <div class="profile-hero">
-          <div class="profile-avatar" id="profile-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-            </svg>
-          </div>
-          <div class="profile-hero-info">
-            <div class="profile-name" id="profile-name">—</div>
-            <div class="profile-nickname" id="profile-nickname" style="display:none"></div>
-            <div class="profile-title-text" id="profile-title-text" style="display:none"></div>
-            <div class="profile-badges" id="profile-badges"></div>
-          </div>
-          <div class="profile-hero-actions">
-            <button id="profile-edit-btn" class="btn btn-ghost btn-sm">Edit</button>
-          </div>
-        </div>
-        <div class="profile-notes-card" id="profile-notes-card" style="display:none">
-          <div class="profile-notes-text" id="profile-notes-text"></div>
-        </div>
-        <div class="profile-props-top">
-          <div class="profile-props-label">Properties</div>
-          <button id="profile-add-prop-btn" class="btn btn-primary btn-sm">+ Add property</button>
-        </div>
-        <div id="profile-properties"></div>
+</div>
+
+<!-- Profile slide-over drawer (outside #app so it overlays everything) -->
+<div id="profile-backdrop"></div>
+<div id="profile-panel">
+  <div class="profile-panel-header">
+    <button id="profile-panel-close" class="btn-icon" title="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <div class="profile-panel-title">Person Profile</div>
+  </div>
+  <div id="profile-panel-body"></div>
+</div>
+
+<!-- Property add/edit modal -->
+<div id="prop-modal-overlay" class="modal-hidden">
+  <div id="prop-modal">
+    <div class="modal-header">
+      <h2 id="prop-modal-title">Add Property</h2>
+      <button id="prop-modal-close" class="btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" id="prop-type-group">
+        <label class="form-label" for="prop-type-select">Property type</label>
+        <select id="prop-type-select" class="form-select"></select>
       </div>
-      <div id="profile-right">
-        <div class="profile-sidebar-heading">Connections</div>
-        <div id="profile-connections"></div>
+      <div id="prop-dynamic-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="prop-modal-delete" class="btn btn-danger" style="display:none">Delete</button>
+      <div class="modal-footer-right">
+        <button id="prop-modal-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="prop-modal-save" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>
-
 </div>
 
 <!-- Node creation / edit modal -->
@@ -295,34 +296,6 @@
       <div class="modal-footer-right">
         <button id="link-modal-cancel" class="btn btn-ghost">Cancel</button>
         <button id="link-modal-save" class="btn btn-primary">Create</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Property add / edit modal -->
-<div id="prop-modal-overlay" class="modal-hidden">
-  <div id="prop-modal">
-    <div class="modal-header">
-      <h2 id="prop-modal-title">Add Property</h2>
-      <button id="prop-modal-close" class="btn-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label" for="prop-type-select">Type</label>
-        <select id="prop-type-select" class="form-select"></select>
-      </div>
-      <div id="prop-dynamic-fields"></div>
-    </div>
-    <div class="modal-footer">
-      <button id="prop-modal-delete" class="btn btn-danger" style="display:none">Delete</button>
-      <div class="modal-footer-right">
-        <button id="prop-modal-cancel" class="btn btn-ghost">Cancel</button>
-        <button id="prop-modal-save" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>
