@@ -95,8 +95,8 @@ async function loadGraph() {
 
 function setStatus(state) {
   const dot = el('status-indicator');
-  dot.className = 'status-dot';
-  dot.classList.add(`status-${state}`);
+  dot.classList.remove('status-ok', 'status-loading', 'status-error');
+  dot.classList.add('status-dot', `status-${state}`);
 }
 
 // ---- Header buttons ----

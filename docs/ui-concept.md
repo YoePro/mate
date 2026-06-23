@@ -30,3 +30,8 @@ MATE uses a node based workspace inspired by Node RED, adapted for relationship 
 ## Current limitation
 
 In version 0.5, graph changes are kept in temporary frontend state. Backend persistence is planned for later API and storage versions.
+
+
+## Next integration step
+
+The next implementation step is backend API integration with temporary storage. The frontend should keep the current interaction model while replacing temporary graph state with API-backed create, list, update, and relationship calls.
