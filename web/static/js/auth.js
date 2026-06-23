@@ -1,5 +1,4 @@
-// auth.js — session-based authentication for the Go backend
-// Bolt/Supabase version uses Supabase auth; this version uses the Go /api/v1/auth endpoints.
+// auth.js — Supabase authentication
 
 const auth = (() => {
   let _mode = 'signin';
@@ -8,27 +7,22 @@ const auth = (() => {
     _initTabs();
     _initForm();
     _initSignOut();
-    _checkSession();
-  }
 
-  async function _checkSession() {
-    try {
-      const user = await apiFetch('/auth/me');
-      if (user) {
-        _onSignedIn(user);
-      } else {
+    // Auth state listener — never call Supabase methods inside this callback
+    db.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && session)) {
+        _onSignedIn(session.user);
+      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
         _onSignedOut();
       }
-    } catch {
-      _onSignedOut();
-    }
+    });
   }
 
   function _onSignedIn(user) {
     el('login-screen').style.display = 'none';
     el('app').classList.remove('app-hidden');
     const emailEl = el('user-email-display');
-    if (emailEl) emailEl.textContent = user.email || user.username || '';
+    if (emailEl) emailEl.textContent = user.email;
     window.dispatchEvent(new CustomEvent('mate:authed', { detail: { user } }));
   }
 
@@ -46,8 +40,7 @@ const auth = (() => {
         qsa('.login-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         _mode = tab.dataset.tab;
-        const btn = el('auth-submit');
-        btn.textContent = _mode === 'signin' ? 'Sign in' : 'Create account';
+        el('auth-submit').textContent = _mode === 'signin' ? 'Sign in' : 'Create account';
         const msg = el('auth-message');
         msg.textContent = '';
         msg.classList.remove('success');
@@ -70,17 +63,17 @@ const auth = (() => {
       submit.textContent = _mode === 'signin' ? 'Signing in...' : 'Creating account...';
       msg.textContent = '';
       msg.classList.remove('success');
+
       try {
-        const endpoint = _mode === 'signin' ? '/auth/signin' : '/auth/signup';
-        const user = await apiFetch(endpoint, {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
-        if (_mode === 'signup') {
+        if (_mode === 'signin') {
+          const { error } = await db.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const { error } = await db.auth.signUp({ email, password });
+          if (error) throw error;
           msg.classList.add('success');
           msg.textContent = 'Account created — signing you in...';
         }
-        _onSignedIn(user);
       } catch (err) {
         msg.textContent = err.message || 'Authentication failed.';
         msg.classList.remove('success');
@@ -98,10 +91,8 @@ const auth = (() => {
   }
 
   function _initSignOut() {
-    el('btn-signout').addEventListener('click', async () => {
-      await apiFetch('/auth/signout', { method: 'POST' }).catch(() => {});
-      _onSignedOut();
-    });
+    const btn = el('btn-signout');
+    if (btn) btn.addEventListener('click', () => db.auth.signOut());
   }
 
   return { init };
