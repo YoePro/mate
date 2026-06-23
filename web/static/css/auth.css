@@ -36,7 +36,7 @@
   display: block;
 }
 
-.login-title {
+.login-brand-name {
   font-size: 30px;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -44,7 +44,7 @@
   margin-bottom: 6px;
 }
 
-.login-subtitle {
+.login-brand-sub {
   font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.05em;
@@ -55,7 +55,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: 3px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   gap: 2px;
 }
 
@@ -68,12 +68,19 @@
   color: var(--text-muted);
   transition: color 0.15s, background 0.15s;
   text-align: center;
+  cursor: pointer;
 }
 
 .login-tab.active {
   background: var(--bg-elevated);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+}
+
+.login-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .auth-message {
@@ -88,7 +95,7 @@
   color: var(--success);
 }
 
-.btn-full {
+.login-submit {
   width: 100%;
   justify-content: center;
   padding: 10px 16px;
@@ -96,7 +103,7 @@
   margin-top: 4px;
 }
 
-.auth-footer {
+.login-footer {
   margin-top: 24px;
   text-align: center;
   font-size: 11px;
@@ -106,4 +113,28 @@
 
 .app-hidden {
   display: none !important;
+}
+
+/* User info in header */
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+#user-email-display {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
 }
