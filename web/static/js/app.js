@@ -46,7 +46,7 @@ function boot() {
     renderAllNodes();
     renderAllLinks();
     graph.selectNode(null);
-    router.navigate('graph');
+    profile.close();
   });
 }
 
@@ -80,10 +80,6 @@ function initHeaderButtons() {
   el('btn-reload').addEventListener('click', async () => {
     graph.selectNode(null);
     await loadGraph();
-  });
-
-  el('btn-back-graph').addEventListener('click', () => {
-    router.navigate('graph');
   });
 }
 
@@ -154,10 +150,12 @@ function renderInspector(nodeId) {
     const title = createEl('div', 'inspector-section-title');
     title.textContent = `Connections (${nodeLinks.length})`;
     sec.appendChild(title);
+
     nodeLinks.forEach(link => {
       const otherId = link.sourceId === nodeId ? link.targetId : link.sourceId;
       const other = graph.getNode(otherId);
       if (!other) return;
+
       const item = createEl('div', 'inspector-rel-item');
       const dot = createEl('span', 'inspector-rel-dot');
       dot.style.background = getNodeColor(other.entityType);
@@ -179,7 +177,7 @@ function renderInspector(nodeId) {
   if (node.entityType === 'person') {
     const profileBtn = createEl('button', 'btn btn-primary');
     profileBtn.textContent = 'View Profile';
-    profileBtn.addEventListener('click', () => router.navigate('profile', { personId: nodeId }));
+    profileBtn.addEventListener('click', () => profile.open(nodeId));
     actions.appendChild(profileBtn);
   }
 
@@ -197,6 +195,7 @@ const FORM_FIELDS = {
     { key: 'name',     label: 'Full name',    type: 'text',     required: true },
     { key: 'nickname', label: 'Nickname',      type: 'text'  },
     { key: 'title',    label: 'Title / Role',  type: 'text'  },
+    { key: 'gender',   label: 'Gender',        type: 'gender' },
     { key: 'notes',    label: 'Notes',         type: 'textarea' },
     { key: 'deceased', label: 'Deceased / Legacy', type: 'checkbox' },
   ],
@@ -266,6 +265,34 @@ function buildModalForm(entityType, data) {
     label.setAttribute('for', `field-${field.key}`);
     label.textContent = field.label + (field.required ? ' *' : '');
 
+    if (field.type === 'gender') {
+      const currentVal = (data && data.gender) || '';
+      const btnGroup = createEl('div', 'gender-select-group');
+      [['m', 'Male'], ['f', 'Female'], ['o', 'Other']].forEach(([val, lbl]) => {
+        const btn = createEl('button', `gender-btn${currentVal === val ? ` active-${val}` : ''}`);
+        btn.type = 'button';
+        btn.textContent = lbl;
+        btn.dataset.key = 'gender';
+        btn.dataset.genderVal = val;
+        btn.addEventListener('click', () => {
+          qsa('.gender-btn', form).forEach(b => {
+            b.className = 'gender-btn';
+            b.dataset.active = '';
+          });
+          if (btn.dataset.active !== val) {
+            btn.className = `gender-btn active-${val}`;
+            btn.dataset.active = val;
+          }
+        });
+        if (currentVal === val) btn.dataset.active = val;
+        btnGroup.appendChild(btn);
+      });
+      group.appendChild(label);
+      group.appendChild(btnGroup);
+      form.appendChild(group);
+      return;
+    }
+
     let input;
     if (field.type === 'textarea') {
       input = createEl('textarea', 'form-input');
@@ -312,6 +339,13 @@ async function handleModalSave() {
       data[key] = input.value.trim();
     }
   });
+
+  const activeGenderBtn = qs('.gender-btn.active-m, .gender-btn.active-f, .gender-btn.active-o', form);
+  if (activeGenderBtn) {
+    data['gender'] = activeGenderBtn.dataset.genderVal;
+  } else if (qs('.gender-btn', form)) {
+    data['gender'] = null;
+  }
 
   const nameField = qsa('[data-key]', form).find(i => i.dataset.key === 'name');
   if (nameField && !nameField.value.trim()) {
@@ -509,7 +543,8 @@ function initSearch() {
       row.addEventListener('click', () => {
         const node = graph.getNode(item.id);
         if (node) { graph.selectNode(node.id); canvas.fitToNodes([node]); }
-        input.value = ''; removeSearchResults();
+        input.value = '';
+        removeSearchResults();
       });
       resultsEl.appendChild(row);
     });
@@ -535,13 +570,17 @@ function initKeyboard() {
       apiDelete(node.entityType, nodeId).then(() => {
         removeNodeEl(nodeId);
         graph.removeNode(nodeId);
-      }).catch(err => { console.error('Delete failed:', err); alert('Could not delete.'); });
+      }).catch(err => {
+        console.error('Delete failed:', err);
+        alert('Could not delete.');
+      });
     }
 
     if (e.key === 'Escape') {
       graph.setLinkSource(null);
       graph.selectNode(null);
       cancelAddMode();
+      profile.close();
     }
   });
 }
