@@ -1,14 +1,32 @@
 // Router: view management
-// Currently graph view only; extended in future versions.
 
 const router = (() => {
+  let _currentView = 'graph';
+
   function navigate(view, params) {
-    if (view === 'graph') showGraphView();
+    if (view === 'profile' && params && params.personId) {
+      _showProfile(params.personId);
+    } else {
+      _showGraph();
+    }
   }
 
-  function showGraphView() {
-    // graph view is the default and only view in this version
+  function _showProfile(personId) {
+    _currentView = 'profile';
+    el('main').style.display = 'none';
+    el('profile-view').classList.remove('view-hidden');
+    el('header').classList.add('profile-mode');
+    profile.load(personId);
   }
 
-  return { navigate };
+  function _showGraph() {
+    _currentView = 'graph';
+    el('profile-view').classList.add('view-hidden');
+    el('main').style.display = '';
+    el('header').classList.remove('profile-mode');
+  }
+
+  function currentView() { return _currentView; }
+
+  return { navigate, currentView };
 })();

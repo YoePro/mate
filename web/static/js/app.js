@@ -7,7 +7,9 @@ let modalX = 0, modalY = 0;
 
 // ---- Boot ----
 
-async function boot() {
+function boot() {
+  auth.init();
+
   initToolbox();
   initInspector();
   initModals();
@@ -15,11 +17,13 @@ async function boot() {
   initSearch();
   initKeyboard();
   initHeaderButtons();
+  profile.initPropModal();
 
   graph.on('nodes-changed', renderAllNodes);
   graph.on('node-updated', (node) => {
     renderNode(node);
     if (graph.selectedNodeId === node.id) renderInspector(node.id);
+    profile.onPersonUpdated(node.id);
   });
   graph.on('node-moved', (node) => {
     updateLinksForNode(node.id);
@@ -36,7 +40,14 @@ async function boot() {
   });
   graph.on('link-source-changed', updateLinkSource);
 
-  await loadGraph();
+  window.addEventListener('mate:authed', () => loadGraph());
+  window.addEventListener('mate:signed-out', () => {
+    graph.clear();
+    renderAllNodes();
+    renderAllLinks();
+    graph.selectNode(null);
+    router.navigate('graph');
+  });
 }
 
 async function loadGraph() {
@@ -69,6 +80,10 @@ function initHeaderButtons() {
   el('btn-reload').addEventListener('click', async () => {
     graph.selectNode(null);
     await loadGraph();
+  });
+
+  el('btn-back-graph').addEventListener('click', () => {
+    router.navigate('graph');
   });
 }
 
@@ -116,6 +131,11 @@ function renderInspector(nodeId) {
       title.textContent = node.data.title;
       body.appendChild(title);
     }
+    if (node.data.type && node.entityType !== 'person') {
+      const typeLabel = createEl('div', 'inspector-subtitle');
+      typeLabel.textContent = node.data.type.charAt(0).toUpperCase() + node.data.type.slice(1);
+      body.appendChild(typeLabel);
+    }
     if (node.data.notes) {
       const sec = createEl('div', 'inspector-section');
       const title = createEl('div', 'inspector-section-title');
@@ -134,12 +154,10 @@ function renderInspector(nodeId) {
     const title = createEl('div', 'inspector-section-title');
     title.textContent = `Connections (${nodeLinks.length})`;
     sec.appendChild(title);
-
     nodeLinks.forEach(link => {
       const otherId = link.sourceId === nodeId ? link.targetId : link.sourceId;
       const other = graph.getNode(otherId);
       if (!other) return;
-
       const item = createEl('div', 'inspector-rel-item');
       const dot = createEl('span', 'inspector-rel-dot');
       dot.style.background = getNodeColor(other.entityType);
@@ -157,6 +175,14 @@ function renderInspector(nodeId) {
   }
 
   const actions = createEl('div', 'inspector-actions');
+
+  if (node.entityType === 'person') {
+    const profileBtn = createEl('button', 'btn btn-primary');
+    profileBtn.textContent = 'View Profile';
+    profileBtn.addEventListener('click', () => router.navigate('profile', { personId: nodeId }));
+    actions.appendChild(profileBtn);
+  }
+
   const editBtn = createEl('button', 'btn btn-ghost');
   editBtn.textContent = 'Edit';
   editBtn.addEventListener('click', () => openEditModal(nodeId));
@@ -168,17 +194,31 @@ function renderInspector(nodeId) {
 
 const FORM_FIELDS = {
   person: [
-    { key: 'name',     label: 'Full name',       type: 'text',     required: true },
-    { key: 'nickname', label: 'Nickname',         type: 'text'  },
-    { key: 'title',    label: 'Title / Role',     type: 'text'  },
-    { key: 'notes',    label: 'Notes',            type: 'textarea' },
+    { key: 'name',     label: 'Full name',    type: 'text',     required: true },
+    { key: 'nickname', label: 'Nickname',      type: 'text'  },
+    { key: 'title',    label: 'Title / Role',  type: 'text'  },
+    { key: 'notes',    label: 'Notes',         type: 'textarea' },
     { key: 'deceased', label: 'Deceased / Legacy', type: 'checkbox' },
   ],
-  company:     [{ key: 'name', label: 'Company name',     type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  association: [{ key: 'name', label: 'Association name', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  school:      [{ key: 'name', label: 'School name',      type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  location:    [{ key: 'name', label: 'Location name',    type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  tag:         [{ key: 'name', label: 'Tag name',         type: 'text', required: true }],
+  company: [
+    { key: 'name',  label: 'Company name', type: 'text', required: true },
+    { key: 'notes', label: 'Notes',        type: 'textarea' },
+  ],
+  association: [
+    { key: 'name',  label: 'Association name', type: 'text', required: true },
+    { key: 'notes', label: 'Notes',             type: 'textarea' },
+  ],
+  school: [
+    { key: 'name',  label: 'School name', type: 'text', required: true },
+    { key: 'notes', label: 'Notes',       type: 'textarea' },
+  ],
+  location: [
+    { key: 'name',  label: 'Location name', type: 'text', required: true },
+    { key: 'notes', label: 'Notes',          type: 'textarea' },
+  ],
+  tag: [
+    { key: 'name', label: 'Tag name', type: 'text', required: true },
+  ],
 };
 
 function initModals() {
@@ -266,7 +306,11 @@ async function handleModalSave() {
 
   qsa('[data-key]', form).forEach(input => {
     const key = input.dataset.key;
-    data[key] = input.type === 'checkbox' ? input.checked : input.value.trim();
+    if (input.type === 'checkbox') {
+      data[key] = input.checked;
+    } else {
+      data[key] = input.value.trim();
+    }
   });
 
   const nameField = qsa('[data-key]', form).find(i => i.dataset.key === 'name');
@@ -286,13 +330,13 @@ async function handleModalSave() {
       graph.updateNodeData(modalEntityId, result);
     } else {
       const result = await apiCreate(modalEntityType, data);
-      await apiSavePosition(result.id, modalEntityType, modalX, modalY);
+      const x = modalX, y = modalY;
+      await apiSavePosition(result.id, modalEntityType, x, y);
       graph.addNode({
         id: result.id,
         entityType: modalEntityType,
         label: result.name || result.nickname || '?',
-        x: modalX,
-        y: modalY,
+        x, y,
         data: result,
       });
     }
@@ -426,10 +470,7 @@ function initSearch() {
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    if (q.length < 2) {
-      removeSearchResults();
-      return;
-    }
+    if (q.length < 2) { removeSearchResults(); return; }
     searchTimer = setTimeout(async () => {
       const results = await apiSearchAll(q).catch(() => null);
       if (!results) return;
@@ -438,10 +479,7 @@ function initSearch() {
   });
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      input.value = '';
-      removeSearchResults();
-    }
+    if (e.key === 'Escape') { input.value = ''; removeSearchResults(); }
   });
 
   document.addEventListener('click', (e) => {
@@ -459,7 +497,6 @@ function initSearch() {
 
     resultsEl = createEl('div', '');
     resultsEl.id = 'search-results';
-
     all.forEach(item => {
       const row = createEl('div', 'search-result-item');
       const dot = createEl('span', 'search-result-dot');
@@ -468,17 +505,11 @@ function initSearch() {
       name.textContent = item.name;
       const type = createEl('span', 'search-result-type');
       type.textContent = ENTITY_LABELS[item.type] || item.type;
-      row.appendChild(dot);
-      row.appendChild(name);
-      row.appendChild(type);
+      row.appendChild(dot); row.appendChild(name); row.appendChild(type);
       row.addEventListener('click', () => {
         const node = graph.getNode(item.id);
-        if (node) {
-          graph.selectNode(node.id);
-          canvas.fitToNodes([node]);
-        }
-        input.value = '';
-        removeSearchResults();
+        if (node) { graph.selectNode(node.id); canvas.fitToNodes([node]); }
+        input.value = ''; removeSearchResults();
       });
       resultsEl.appendChild(row);
     });
@@ -504,10 +535,7 @@ function initKeyboard() {
       apiDelete(node.entityType, nodeId).then(() => {
         removeNodeEl(nodeId);
         graph.removeNode(nodeId);
-      }).catch(err => {
-        console.error('Delete failed:', err);
-        alert('Could not delete.');
-      });
+      }).catch(err => { console.error('Delete failed:', err); alert('Could not delete.'); });
     }
 
     if (e.key === 'Escape') {

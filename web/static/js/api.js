@@ -1,5 +1,4 @@
 // API layer — calls the Go backend at /api/v1
-// window.MATE_CONFIG is loaded from /static/js/config.js served by the backend.
 
 const BASE = '/api/v1';
 
@@ -15,20 +14,17 @@ async function apiFetch(path, options) {
   return res.json();
 }
 
-// Map entity type to API resource path
 function entityPath(entityType) {
-  if (entityType === 'person')                          return 'persons';
+  if (entityType === 'person')                                                    return 'persons';
   if (entityType === 'company' || entityType === 'association' || entityType === 'school') return 'organizations';
-  if (entityType === 'location')                        return 'locations';
-  if (entityType === 'tag')                             return 'tags';
+  if (entityType === 'location')                                                  return 'locations';
+  if (entityType === 'tag')                                                       return 'tags';
   return entityType + 's';
 }
 
 async function apiCreate(entityType, data) {
   const body = Object.assign({}, data);
-  if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
-    body.type = entityType;
-  }
+  if (entityType === 'company' || entityType === 'association' || entityType === 'school') body.type = entityType;
   return apiFetch('/' + entityPath(entityType), { method: 'POST', body: JSON.stringify(body) });
 }
 
@@ -41,10 +37,7 @@ async function apiDelete(entityType, id) {
 }
 
 async function apiLoadAll() {
-  const [graph] = await Promise.all([
-    apiFetch('/graph'),
-  ]);
-  return graph;
+  return apiFetch('/graph');
 }
 
 async function apiSavePosition(nodeId, nodeType, x, y) {
@@ -67,4 +60,36 @@ async function apiDeleteRelationship(id) {
 
 async function apiSearchAll(query) {
   return apiFetch('/search?q=' + encodeURIComponent(query));
+}
+
+// ---- Person profile API ----
+
+async function apiGetPerson(id) {
+  return apiFetch('/persons/' + id);
+}
+
+async function apiGetPersonRelationships(personId) {
+  return apiFetch('/persons/' + personId + '/relationships');
+}
+
+async function apiGetPersonProperties(personId) {
+  return apiFetch('/persons/' + personId + '/properties');
+}
+
+async function apiCreatePersonProperty(personId, type, label, value, meta) {
+  return apiFetch('/persons/' + personId + '/properties', {
+    method: 'POST',
+    body: JSON.stringify({ type, label: label || null, value: value || null, meta: meta || null }),
+  });
+}
+
+async function apiUpdatePersonProperty(id, updates) {
+  return apiFetch('/person-properties/' + id, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+async function apiDeletePersonProperty(id) {
+  await apiFetch('/person-properties/' + id, { method: 'DELETE' });
 }
