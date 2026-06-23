@@ -103,9 +103,11 @@ function attachNodeEvents(wrap, node) {
         handleNodeClick(node.id, e);
       } else {
         clearTimeout(positionSaveTimer);
-        positionSaveTimer = setTimeout(() => {
-          apiSavePosition(node.id, node.entityType, node.x, node.y);
-        }, 400);
+        if (!isTemporaryGraphMode()) {
+          positionSaveTimer = setTimeout(() => {
+            apiSavePosition(node.id, node.entityType, node.x, node.y);
+          }, 400);
+        }
       }
     }
 

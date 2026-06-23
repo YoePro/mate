@@ -5,6 +5,46 @@ let modalEntityType = null;
 let modalEntityId = null;
 let modalX = 0, modalY = 0;
 
+let temporaryIdCounter = 1;
+
+function isTemporaryGraphMode() {
+  return Boolean(window.MATE_CONFIG && window.MATE_CONFIG.temporaryGraph);
+}
+
+function isTemporaryApiError(err) {
+  return err && /^(404|501)\b/.test(err.message || '');
+}
+
+function createTemporaryEntity(entityType, data) {
+  const record = Object.assign({}, data, {
+    id: `tmp-${entityType}-${Date.now()}-${temporaryIdCounter++}`,
+    temporary: true,
+  });
+
+  if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
+    record.type = entityType;
+  }
+
+  return record;
+}
+
+function createTemporaryRelationship(source, target, type, notes) {
+  return {
+    id: `tmp-rel-${Date.now()}-${temporaryIdCounter++}`,
+    source_id: source.id,
+    source_type: source.entityType,
+    target_id: target.id,
+    target_type: target.entityType,
+    type,
+    notes: notes || null,
+    temporary: true,
+  };
+}
+
+function localOnlyWarning(action, err) {
+  console.warn(`${action} is using temporary frontend state:`, err.message);
+}
+
 // ---- Boot ----
 
 async function boot() {
@@ -282,11 +322,33 @@ async function handleModalSave() {
 
   try {
     if (modalEntityId) {
-      const result = await apiUpdate(modalEntityType, modalEntityId, data);
+      let result;
+      if (isTemporaryGraphMode()) {
+        result = Object.assign({}, graph.getNode(modalEntityId).data, data);
+      } else {
+        try {
+          result = await apiUpdate(modalEntityType, modalEntityId, data);
+        } catch (err) {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node update', err);
+          result = Object.assign({}, graph.getNode(modalEntityId).data, data);
+        }
+      }
       graph.updateNodeData(modalEntityId, result);
     } else {
-      const result = await apiCreate(modalEntityType, data);
-      await apiSavePosition(result.id, modalEntityType, modalX, modalY);
+      let result;
+      if (isTemporaryGraphMode()) {
+        result = createTemporaryEntity(modalEntityType, data);
+      } else {
+        try {
+          result = await apiCreate(modalEntityType, data);
+          await apiSavePosition(result.id, modalEntityType, modalX, modalY);
+        } catch (err) {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node creation', err);
+          result = createTemporaryEntity(modalEntityType, data);
+        }
+      }
       graph.addNode({
         id: result.id,
         entityType: modalEntityType,
@@ -312,7 +374,14 @@ async function handleModalDelete() {
   if (!confirm(`Delete "${node ? node.label : '?'}"? This will also remove all relationships.`)) return;
 
   try {
-    await apiDelete(modalEntityType, modalEntityId);
+    if (!isTemporaryGraphMode()) {
+      try {
+        await apiDelete(modalEntityType, modalEntityId);
+      } catch (err) {
+        if (!isTemporaryApiError(err)) throw err;
+        localOnlyWarning('Node delete', err);
+      }
+    }
     removeNodeEl(modalEntityId);
     graph.removeNode(modalEntityId);
     closeModal();
@@ -385,11 +454,22 @@ async function handleLinkSave() {
 
   el('link-modal-save').disabled = true;
   try {
-    const rel = await apiCreateRelationship(
-      source.id, source.entityType,
-      target.id, target.entityType,
-      type, notes
-    );
+    let rel;
+    if (isTemporaryGraphMode()) {
+      rel = createTemporaryRelationship(source, target, type, notes);
+    } else {
+      try {
+        rel = await apiCreateRelationship(
+          source.id, source.entityType,
+          target.id, target.entityType,
+          type, notes
+        );
+      } catch (err) {
+        if (!isTemporaryApiError(err)) throw err;
+        localOnlyWarning('Relationship creation', err);
+        rel = createTemporaryRelationship(source, target, type, notes);
+      }
+    }
     graph.addLink({
       id: rel.id,
       sourceId: source.id,
@@ -501,7 +581,14 @@ function initKeyboard() {
       const nodeId = graph.selectedNodeId;
       const node = graph.getNode(nodeId);
       if (!confirm(`Delete "${node ? node.label : '?'}"?`)) return;
-      apiDelete(node.entityType, nodeId).then(() => {
+      const deletePromise = isTemporaryGraphMode()
+        ? Promise.resolve()
+        : apiDelete(node.entityType, nodeId).catch(err => {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node delete', err);
+        });
+
+      deletePromise.then(() => {
         removeNodeEl(nodeId);
         graph.removeNode(nodeId);
       }).catch(err => {
