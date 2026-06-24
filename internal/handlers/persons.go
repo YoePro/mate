@@ -21,6 +21,10 @@ func CreatePerson(w http.ResponseWriter, r *http.Request) {
 func (api *API) Persons(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if err := api.requireDataRead(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		persons, err := api.services.Persons.List(r.Context())
 		if err != nil {
 			writeServiceError(w, err)
@@ -28,6 +32,10 @@ func (api *API) Persons(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, persons)
 	case http.MethodPost:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		var person models.Person
 		if err := decodeJSON(r, &person); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json")
@@ -61,6 +69,10 @@ func (api *API) Person(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		if err := api.requireDataRead(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		person, err := api.services.Persons.Get(r.Context(), id)
 		if err != nil {
 			writeServiceError(w, err)
@@ -68,6 +80,10 @@ func (api *API) Person(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, person)
 	case http.MethodPut:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		var person models.Person
 		if err := decodeJSON(r, &person); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json")
@@ -80,6 +96,10 @@ func (api *API) Person(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, updated)
 	case http.MethodDelete:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		if err := api.services.Persons.Delete(r.Context(), id); err != nil {
 			writeServiceError(w, err)
 			return
@@ -106,6 +126,10 @@ func (api *API) personProfile(w http.ResponseWriter, r *http.Request, personID s
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	if err := api.requireDataRead(r); err != nil {
+		writeServiceError(w, err)
+		return
+	}
 	profile, err := api.services.Persons.Profile(r.Context(), personID)
 	if err != nil {
 		writeServiceError(w, err)
@@ -118,6 +142,10 @@ func (api *API) personAttributes(w http.ResponseWriter, r *http.Request, personI
 	if len(parts) == 0 {
 		switch r.Method {
 		case http.MethodGet:
+			if err := api.requireDataRead(r); err != nil {
+				writeServiceError(w, err)
+				return
+			}
 			attributes, err := api.services.Persons.ListAttributes(r.Context(), personID)
 			if err != nil {
 				writeServiceError(w, err)
@@ -125,6 +153,10 @@ func (api *API) personAttributes(w http.ResponseWriter, r *http.Request, personI
 			}
 			writeJSON(w, http.StatusOK, attributes)
 		case http.MethodPost:
+			if err := api.requireDataWrite(r); err != nil {
+				writeServiceError(w, err)
+				return
+			}
 			var attribute models.PersonAttribute
 			if err := decodeJSON(r, &attribute); err != nil {
 				writeError(w, http.StatusBadRequest, "invalid json")
@@ -151,6 +183,10 @@ func (api *API) personAttributes(w http.ResponseWriter, r *http.Request, personI
 	if len(parts) == 2 && parts[1] == "archive" {
 		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
 			return
 		}
 		if err := api.services.Persons.ArchiveAttribute(r.Context(), personID, attributeID); err != nil {

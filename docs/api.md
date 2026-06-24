@@ -12,6 +12,8 @@ All requests and responses use JSON.
 
 The web frontend is served by the same Go application.
 
+Except for health, setup, login, logout, and static assets, API endpoints require an authenticated `mate_session` cookie. Read endpoints allow any active role. Data write endpoints require `owner`, `admin`, or `editor`. `viewer` is read-only. Account management endpoints require `owner`.
+
 Errors use this JSON shape:
 
 ```json

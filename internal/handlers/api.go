@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"mate/internal/models"
 	"mate/internal/services"
 	"mate/internal/storage"
 )
@@ -38,6 +39,24 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func decodeJSON(r *http.Request, target any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(target)
+}
+
+func (api *API) requireDataRead(r *http.Request) error {
+	_, err := api.currentAccount(r)
+	return err
+}
+
+func (api *API) requireDataWrite(r *http.Request) error {
+	account, err := api.currentAccount(r)
+	if err != nil {
+		return err
+	}
+	switch account.Role {
+	case models.RoleOwner, models.RoleAdmin, models.RoleEditor:
+		return nil
+	default:
+		return services.ErrForbidden
+	}
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {

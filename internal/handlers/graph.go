@@ -25,6 +25,10 @@ func (api *API) Graph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := api.requireDataRead(r); err != nil {
+		writeServiceError(w, err)
+		return
+	}
 	graph, err := api.services.Graph.Get(r.Context())
 	if err != nil {
 		writeServiceError(w, err)
@@ -40,6 +44,10 @@ func (api *API) Positions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := api.requireDataWrite(r); err != nil {
+		writeServiceError(w, err)
+		return
+	}
 	var position models.Position
 	if err := decodeJSON(r, &position); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")

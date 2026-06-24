@@ -38,14 +38,13 @@ Primary design principles:
 
 Version logic:
 
-* 0.1, 0.3, 0.5, 0.7 = development versions
-* 0.2, 0.4, 0.6, 0.8 = debug and stabilization versions
-* 0.9 = beta
-* 1.0 = first stable release
-* From 1.0 onward:
-
-  * odd minor versions = development
-  * even minor versions = release and stable versions
+* 0.x odd versions are development versions.
+* 0.x even versions are debug, test, and stabilization versions for the previous development version.
+* 0.9 is a development version, not a beta gate.
+* 0.10 is the debug and stabilization version for 0.9.
+* 0.11 continues development, and later 0.x versions may continue this pattern until MATE is ready for 1.0.
+* 1.0 = first stable release.
+* After 1.0, version semantics can be revisited, but the same development/stabilization rhythm should remain available.
 * Patch versions such as 0.1.1, 0.1.2, 0.2.1 are allowed for small corrections, documentation updates, cleanup, and minor internal adjustments.
 
 Roadmap format:
@@ -89,6 +88,85 @@ MATE should treat people and organizations as rich profiles, not only graph node
 * Time-bound attributes should support start date, end date, current status, source or notes, and optional relationship to an organization.
 * Profiles should show direct relationships, related organizations, timeline-like attribute history, and graph context.
 * The exact data model can evolve, but the API should not force everything into a single notes field.
+
+Entity taxonomy model:
+
+MATE should avoid treating every concrete thing as a top-level node type. Top-level graph entities should stay broad, with subtypes or classifications underneath where appropriate.
+
+Candidate top-level entities:
+
+* Person
+* Organization
+* Project
+* Event, if events become graph entities rather than profile/context objects
+
+Open modeling questions:
+
+* Whether Location should be a top-level entity, a profile/context object, or both depending on use case.
+* Whether Tag should be a graph entity or metadata/classification.
+* Whether Family should be modeled as a group, organization-like entity, network, or relationship cluster.
+* Whether Event should exist as a graph node or as an object attached to people, organizations, projects, or relationships.
+
+Person subtypes and attributes:
+
+* Person should remain the top-level entity.
+* Gender should be modeled as a person attribute or field, not as separate top-level node types.
+* Current known gender values are male, female, and other/unknown.
+
+Organization subtypes:
+
+Organization should remain the top-level entity, with subtype values such as:
+
+* Company
+* Association
+* School
+* Government
+* Political Party
+* Religious Organization
+* Sports Club
+* Military Unit
+* NGO
+* Community
+
+Project entity:
+
+Project should be considered its own top-level entity because it can be worked on, sponsored, owned, joined, paused, archived, and related to both people and organizations. Examples include:
+
+* MATE
+* GoFood
+* Minecraft Server
+
+Event modeling candidates:
+
+Events may be useful as graph nodes or as attached objects. This should be decided by workflow need. Candidate event types include:
+
+* Wedding
+* Conference
+* Birthday
+* Meeting
+* Trip
+* Dinner
+* School Reunion
+
+Relationship attributes:
+
+Relationships should be able to carry structured attributes where the relationship itself has important context. Example: `Person -> works_at -> Organization` may need `role: "Sales Manager"`, `start_date`, `end_date`, `current`, or notes. Common role examples include Sales Manager, Developer, Chairman, and Teacher.
+
+Network and ownership model:
+
+MATE should support user-owned networks before 1.0. A network is a user's bounded relationship map containing people, organizations, relationships, notes, context, and layout for a specific purpose.
+
+* Each account can create one or more networks.
+* A network has one owner account.
+* Only the network owner can edit the network unless explicit sharing permissions are added later.
+* Non-owners must not be allowed to edit another user's network data.
+* Users should only see their own networks by default.
+* Sharing must be explicit and permissioned, never implicit.
+* Global person identity should be separated from network-specific notes, context, relationship meaning, and layout.
+* The same global person may appear in multiple networks.
+* Person creation inside a network should search for possible existing global persons before creating a new global person.
+* Duplicate detection should produce suggestions with confidence score and matching reason.
+* Matching can use name, nickname, organization, school, location, and known relationships.
 
 0.1 Development
 
@@ -874,106 +952,297 @@ Documentation checklist:
 * Document authentication limitations before full beta hardening.
 * Document role permissions.
 
-0.9 Beta
+0.9 Development
 
 Goal:
-Harden the Neo4j-backed application into a local beta.
+Add user-owned networks and duplicate-aware person creation.
 
 Scope:
-Neo4j storage already exists from 0.7. This version turns the system into a usable beta by hardening account flows, edit flows, archive behavior, import/export planning, backup documentation, and private data handling.
+This version introduces networks as first-class user-owned graph contexts. A user can create one or more networks, add existing or new people to a network, and keep network-specific notes and context separate from global person identity. Person creation should detect possible duplicates and suggest matches before creating a new global person. When duplicates are confirmed, MATE should support merging entities while preserving network ownership rules and moving non-conflicting properties to the surviving entity.
 
 Implementation checklist:
 
-* Review Neo4j schema, constraints, indexes, and query performance.
-* Review storage.Storage interface after real Neo4j usage.
-* Finalize node labels:
+* Add Network model.
+* Add NetworkMembership or NetworkPermission model if needed for future sharing.
+* Add network owner relationship from Account to Network.
+* Add storage methods for:
 
-  * Person
-  * Organization
-  * Company
-  * Association
-  * School
-  * Location
-  * Tag
-* Decide whether Company, Association, and School are separate labels or organization subtypes.
-* Add login page.
-* Add owner bootstrap flow UI.
-* Add create-account page for owner.
-* Add user admin page for owner.
-* Add account management view for owner, including list accounts, create account, change role, and disable account.
-* Add navigation from the app header to user admin for owner accounts.
-* Add basic edit forms.
-* Add update person.
-* Add update person profile fields.
-* Add add/edit/archive person attributes.
-* Add update organization.
-* Add update organization profile fields.
-* Add add/edit/archive organization attributes.
-* Add update relationship.
-* Add delete or archive strategy.
-* Prefer archive/soft delete for personal data unless explicitly removed.
-* Add backup/export plan.
-* Add import/export JSON plan.
-* Review private data handling.
-* Add beta release notes.
+  * create network
+  * list networks visible to current user
+  * get network
+  * update network metadata
+  * archive network
+  * add person to network
+  * list network persons
+  * remove or archive person from network
+  * store network-specific person context
+  * store network-specific graph positions
+  * merge global person entities
+  * transfer non-conflicting properties during merge
+  * update network references from merged entity to surviving entity
+* Add API endpoints for:
+
+  * GET /api/v1/networks
+  * POST /api/v1/networks
+  * GET /api/v1/networks/{id}
+  * PUT /api/v1/networks/{id}
+  * POST /api/v1/networks/{id}/archive
+  * GET /api/v1/networks/{id}/graph
+  * GET /api/v1/networks/{id}/persons
+  * POST /api/v1/networks/{id}/persons
+  * GET /api/v1/networks/{id}/persons/{personId}
+  * PUT /api/v1/networks/{id}/persons/{personId}/context
+  * POST /api/v1/networks/{id}/persons/{personId}/archive
+  * POST /api/v1/person-matches
+  * POST /api/v1/persons/{id}/merge
+* Add frontend view for selecting a network.
+* Add frontend flow for creating a network.
+* Make graph load through the selected network context.
+* Keep global person identity separate from network-specific fields.
+* Move network-specific notes, relationship context, and graph layout out of the global person record where appropriate.
+* Allow persons to exist in multiple networks.
+* Add duplicate detection for persons.
+* When creating a person, search for possible existing matching persons.
+* Suggest possible matches before creating a new global person.
+* Allow user to link a network entry to an existing global person.
+* Allow user to create a new global person when no suggestion is correct.
+* Store confidence score for each duplicate suggestion.
+* Store matching reason for each duplicate suggestion.
+* Support matching by:
+
+  * name
+  * nickname
+  * organization
+  * school
+  * location
+  * known relationships
+* Add merge function for confirmed duplicate people/entities.
+* Merge must be permission-aware and network-aware.
+* If two entities are in the same network and only that network references the newer entity, remove the newer entity and keep the earlier entity.
+* If other networks reference the newer entity but not the earlier entity, remove the earlier entity and keep the newer entity.
+* If both entities are referenced by different networks, do not auto-merge until a merge policy is explicitly decided. Candidate policies to evaluate:
+
+  * keep both global identities and only link them as possible duplicates
+  * merge into one global identity and preserve all network-specific contexts
+  * require owner confirmation from every affected network before merge
+  * create a reviewed merge proposal instead of executing immediately
+* When an entity is actually removed during merge, move non-conflicting properties to the surviving entity.
+* Do not overwrite existing properties on the survivor with conflicting values.
+* Preserve sensitive life-event properties such as born, died, deceased, gender, and name variants unless a conflict policy is explicitly chosen.
+* Preserve and reattach profile attributes, relationships, notes, and network context where ownership rules allow it.
+* Add service-level permission checks for every network-scoped write.
+* Ensure users only see their own network data unless sharing is explicitly enabled.
+* Ensure users who do not own a network cannot edit it.
+* Keep sharing model explicit but minimal in 0.9; full sharing UI can come later.
+* Update docs/api.md for networks and duplicate suggestions.
+* Update docs/storage.md and docs/neo4j.md for network schema.
 
 Acceptance criteria:
 
-* MATE is usable as a local beta with Neo4j-backed data.
-* Account, role, profile, attribute, and graph data survive server restart.
-* Existing API endpoints are stable enough for beta use.
-* Login works with persisted accounts.
-* Owner can create and manage other accounts from the browser UI.
-* Owner can open a user admin page and see existing accounts.
-* Owner can open a create-account page and create admin, editor, or viewer accounts.
-* Non-owner roles cannot open or use user admin actions.
-* Frontend graph loads real data from Neo4j.
-* Person profile page loads real data.
-* Organization profile page loads real data.
-* Basic create and edit flows work.
-* Delete/archive behavior is defined.
-* Backup/export is documented.
+* Authenticated user can create a network.
+* Authenticated user can list their own networks.
+* Authenticated user can open their own network.
+* Authenticated user can add a person to a network.
+* A person can appear in more than one network.
+* Network-specific person notes/context do not overwrite global person identity.
+* Graph data can be loaded for a selected network.
+* Graph layout is stored per network.
+* Creating a person returns possible duplicate matches before creating a new global person when likely matches exist.
+* Suggestions include confidence score and matching reason.
+* User can choose an existing suggested person or create a new person.
+* User can merge confirmed duplicate entities when the merge is unambiguous.
+* Merge transfers non-conflicting properties to the surviving entity.
+* Merge does not overwrite conflicting properties without an explicit policy.
+* Merge does not allow a user to modify networks they do not own.
+* Ambiguous cross-network merges are blocked or converted to a review/proposal state until policy is decided.
+* Non-owner cannot edit another user's network.
+* Users do not see other users' networks by default.
 
 Test checklist:
 
-* Start Neo4j.
-* Start MATE.
-* Bootstrap owner account.
-* Log in as owner.
-* Create another account with a non-owner role through the create-account page.
-* Open the user admin page as owner and confirm the account list.
-* Change a user role from the user admin page.
-* Disable a user from the user admin page.
-* Log in as a non-owner and confirm user admin is blocked.
-* Create person through API and UI.
-* Add person profile attributes.
-* Create organization through API and UI.
-* Add organization profile attributes.
-* Create relationship.
-* Restart MATE.
-* Confirm account, person, organization, relationship, and attributes remain.
-* Confirm graph endpoint returns real graph.
-* Confirm frontend renders real graph.
-* Test profile page for real person.
-* Test profile page for real organization.
+* Create a network as owner account.
+* Create a second network as the same account.
+* Confirm both networks are listed for the owner.
+* Add an existing person to both networks.
+* Add different notes/context for the same person in each network.
+* Confirm global person identity remains shared while network context differs.
+* Create a person with a name matching an existing person and confirm duplicate suggestions are returned.
+* Confirm each suggestion has confidence score and matching reason.
+* Link to an existing suggested person.
+* Create a new person despite suggestions.
+* Merge two duplicate people referenced only by the same network.
+* Confirm the newest duplicate is removed when no other networks reference it.
+* Confirm non-conflicting properties move to the survivor during merge.
+* Confirm conflicting properties are not overwritten silently.
+* Test merge where another network references only the newer entity and confirm the earlier entity is removed according to policy.
+* Test merge where both entities are referenced by different networks and confirm it is blocked or marked for review.
+* Create a second user account.
+* Log in as the second user.
+* Confirm the second user cannot see the first user's networks.
+* Confirm the second user cannot edit the first user's network by direct API call.
+* Confirm network-scoped graph endpoint returns only that network's data.
+* Restart MATE and confirm networks, membership, context, duplicate decisions, and graph positions persist.
 * Run go test ./...
-* Run manual end to end test.
 
 Documentation checklist:
 
-* docs/api.md updated for beta behavior.
-* docs/configuration.md updated.
-* docs/accounts.md updated.
-* docs/profile-model.md updated.
-* docs/storage.md updated.
-* docs/neo4j.md updated.
-* Add backup/export documentation.
-* Add privacy warning for local personal data.
+* docs/api.md documents network endpoints.
+* docs/api.md documents duplicate suggestion endpoint and response shape.
+* docs/api.md documents merge endpoint, merge safety rules, and unresolved merge policy cases.
+* docs/storage.md documents global person versus network context.
+* docs/neo4j.md documents network labels, relationships, and constraints.
+* docs/accounts.md documents network ownership permissions.
+* roadmap.txt keeps explicit note that non-owners cannot edit networks they do not own.
+
+0.10 Debug
+
+Goal:
+Stabilize user-owned networks, network permissions, duplicate detection, and merge behavior from 0.9.
+
+Scope:
+This version tests and hardens the network model before more product features are layered on top. Focus on permission boundaries, duplicate matching quality, merge safety, network-scoped graph behavior, and migration of existing global graph behavior into network context.
+
+Implementation checklist:
+
+* Add focused tests for network services.
+* Add focused tests for network handlers.
+* Add focused tests for Neo4j network storage.
+* Review all network-scoped API endpoints for owner checks.
+* Review duplicate matching scoring and reasons.
+* Review merge behavior for same-network and cross-network duplicates.
+* Decide unresolved policy for entities referenced by different networks.
+* Normalize duplicate match thresholds.
+* Decide how low-confidence matches should be presented.
+* Confirm direct API calls cannot bypass ownership checks.
+* Confirm graph positions are network-scoped.
+* Confirm relationships and notes are network-scoped where intended.
+* Review frontend empty-network and no-network states.
+* Review frontend behavior when duplicate suggestions are returned.
+* Add documentation for known duplicate detection limitations.
+
+Acceptance criteria:
+
+* Network permission rules are enforced consistently.
+* Non-owner write attempts return predictable errors.
+* Users cannot list or inspect networks they do not own by default.
+* Duplicate detection is deterministic enough for development use.
+* Merge behavior is predictable and does not silently destroy conflicting data.
+* Cross-network merge behavior is blocked, reviewed, or explicitly policy-driven.
+* Network graph endpoint does not leak data from other networks.
+* Existing 0.7/0.8 graph behavior still works inside a selected network.
+* API documentation matches actual network behavior.
+
+Test checklist:
+
+* Run go test ./...
+* Test network create/list/get/update/archive happy paths.
+* Test network endpoints without login.
+* Test network endpoints as non-owner.
+* Test direct API write attempts against another user's network.
+* Test duplicate matching by name.
+* Test duplicate matching by nickname.
+* Test duplicate matching by organization.
+* Test duplicate matching by school.
+* Test duplicate matching by location.
+* Test duplicate matching by known relationship.
+* Test duplicate matching when no match exists.
+* Test same-network merge.
+* Test merge property transfer.
+* Test merge conflict preservation.
+* Test ambiguous cross-network merge behavior.
+* Test frontend network selection.
+* Test frontend create-person duplicate suggestion flow.
+* Restart MATE and verify network data persists.
+
+Documentation checklist:
+
+* docs/api.md updated after debug findings.
+* docs/storage.md updated after debug findings.
+* docs/neo4j.md updated after debug findings.
+* docs/accounts.md updated with final 0.10 network permission behavior.
+* Document duplicate detection limitations and expected false positives/false negatives.
+
+0.11 Development
+
+Goal:
+Continue product development after network ownership and duplicate detection are stabilized.
+
+Scope:
+This version develops smarter relationship semantics, entity taxonomy, and graph presentation after network ownership is stabilized. Link type options should depend on the broad entity types being linked, not only the current concrete labels. Users should be able to create custom relationship types when the built-in options are not enough. Person node color should reflect gender where known, while still preserving clear fallback colors.
+
+Implementation checklist:
+
+* Review findings from 0.10.
+* Keep user-owned network permissions as a hard boundary.
+* Do not allow non-owners to edit networks unless explicit sharing permissions have been designed and tested.
+* Review and refine entity taxonomy before adding more concrete node types.
+* Treat Person, Organization, and Project as clear top-level entity candidates.
+* Keep Organization subtypes under Organization, such as company, association, school, government, political party, religious organization, sports club, military unit, NGO, and community.
+* Add Project as a first-class entity candidate with relationship types such as person `works_on` project and organization `sponsors` project.
+* Decide whether Event should be a graph node or an attached object before implementing event-specific UI.
+* Decide whether Location and Tag are graph entities, metadata, or both.
+* Decide whether Family is a group/entity, a network, or a relationship cluster.
+* Make relationship type options aware of source and target entity types.
+* Define built-in relationship type sets for common pairs, such as person-to-person, person-to-organization, organization-to-person, organization-to-organization, person-to-project, and organization-to-project.
+* Hide irrelevant relationship types for the selected source/target pair.
+* Add support for custom relationship types.
+* Allow user to create a missing relationship type such as `hates` for person-to-person links.
+* Store custom relationship type label, direction behavior, allowed source/target types, and owner/network scope.
+* Decide whether custom relationship types are global, user-owned, or network-owned.
+* Add structured relationship attributes for role/context where needed, such as `role`, `start_date`, `end_date`, `current`, and notes.
+* Support relationship role examples such as Sales Manager, Developer, Chairman, and Teacher on work or membership relationships.
+* Update relationship creation UI to present type-aware options, custom creation, and relationship attributes when relevant.
+* Color person nodes by gender where known:
+
+  * female/person with gender `f`: pink
+  * male/person with gender `m`: blue
+  * other/unknown: neutral or existing fallback color
+* Ensure gender colors do not break selection, hover, accessibility, or existing organization colors.
+
+Acceptance criteria:
+
+* Broad entity taxonomy is documented before adding new concrete node types.
+* Project is modeled or explicitly deferred with a documented reason.
+* Organization subtypes are represented under Organization rather than as unrelated top-level entity types.
+* Relationship type choices are filtered by source and target entity type.
+* User can create a custom relationship type when no built-in type fits.
+* Custom relationship types obey ownership/network permission rules.
+* Relationship attributes can store role/context for links such as `works_at`.
+* A person with gender `f` renders pink.
+* A person with gender `m` renders blue.
+* Other or unknown gender still renders clearly.
+* New features preserve network ownership rules.
+* New features do not leak or allow edits to another user's private network data.
+
+Test checklist:
+
+* Test taxonomy decisions for Person, Organization, Project, Event, Location, Tag, and Family.
+* Test person-to-person relationship type options.
+* Test person-to-organization relationship type options.
+* Test organization-to-person relationship type options.
+* Test organization-to-organization relationship type options.
+* Test person-to-project relationship type options.
+* Test organization-to-project relationship type options.
+* Test custom relationship type creation.
+* Test custom relationship type reuse.
+* Test relationship attributes such as role on `works_at`.
+* Test non-owner cannot create or modify custom relationship types for a network they do not own.
+* Test female person node renders pink.
+* Test male person node renders blue.
+* Test unknown/other gender fallback color.
+* Include permission tests for all network-scoped behavior.
+
+Documentation checklist:
+
+* Update docs/api.md with entity taxonomy, Project endpoints if implemented, and type-aware/custom relationship type endpoints.
+* Update docs/storage.md with entity taxonomy, relationship attributes, and custom relationship type storage rules.
+* Update docs/neo4j.md with relationship type metadata schema and any Project/Event/Family modeling decisions.
+* Update frontend smoke test documentation for type-aware links, relationship attributes, and gender colors.
 
 1.0 Stable
 
 Goal:
-Release the first stable local version of MATE.
+Release the first stable local version of MATE after the required 0.x development and stabilization cycles are complete.
 
 Scope:
 MATE should be usable for real personal relationship tracking on a local system.

@@ -11,6 +11,10 @@ import (
 func (api *API) Relationships(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if err := api.requireDataRead(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		relationships, err := api.services.Relationships.List(r.Context())
 		if err != nil {
 			writeServiceError(w, err)
@@ -18,6 +22,10 @@ func (api *API) Relationships(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, relationships)
 	case http.MethodPost:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		var relationship models.Relationship
 		if err := decodeJSON(r, &relationship); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json")
@@ -44,6 +52,10 @@ func (api *API) Relationship(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		if err := api.requireDataRead(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		relationship, err := api.services.Relationships.Get(r.Context(), id)
 		if err != nil {
 			writeServiceError(w, err)
@@ -51,6 +63,10 @@ func (api *API) Relationship(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, relationship)
 	case http.MethodDelete:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		if err := api.services.Relationships.Delete(r.Context(), id); err != nil {
 			writeServiceError(w, err)
 			return

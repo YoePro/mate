@@ -14,10 +14,10 @@ MATE 0.7 has persisted accounts, roles, login sessions, and a browser login page
 
 Supported roles are:
 
-- `owner`: can manage accounts through the API.
-- `admin`: reserved for later account-management policy.
-- `editor`: can use the app but cannot manage accounts in 0.7.
-- `viewer`: reserved for read-only behavior in later hardening.
+- `owner`: can manage accounts and write MATE data.
+- `admin`: can write MATE data; account management remains owner-only in 0.8.
+- `editor`: can write MATE data but cannot manage accounts.
+- `viewer`: can read data but cannot create, update, delete, archive, or save graph positions.
 
 ## API-only account management
 
@@ -40,3 +40,12 @@ Successful login sets a HTTP-only `mate_session` cookie. Logout deletes the pers
 - Current-user lookup.
 - Owner creates an additional account and changes its role.
 - Editor account receives `403` for account list/create.
+
+## API access rules
+
+- Health, setup status, login, logout, and static assets are public.
+- MATE data reads require a valid session.
+- MATE data writes require `owner`, `admin`, or `editor`.
+- Account management requires `owner`.
+- Direct API calls by unauthenticated users return `401`.
+- Direct API write calls by `viewer` return `403`.
