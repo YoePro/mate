@@ -77,6 +77,8 @@ MATE should support login before the first stable release. The practical model s
 * Passwords must never be stored in plain text.
 * Authentication and authorization must be enforced in services or middleware, not scattered through handlers.
 * Single-user local use should remain easy, but not rely on an unauthenticated application once accounts exist.
+* The UI should include a create-account window for owners.
+* The UI should include an admin window for account management, role changes, and disabled accounts.
 
 Profile and attribute model:
 
@@ -167,6 +169,85 @@ MATE should support user-owned networks before 1.0. A network is a user's bounde
 * Person creation inside a network should search for possible existing global persons before creating a new global person.
 * Duplicate detection should produce suggestions with confidence score and matching reason.
 * Matching can use name, nickname, organization, school, location, and known relationships.
+
+Network discovery:
+
+MATE should let users create networks, see their own networks, and search for networks beyond their own. Search and discovery must not imply edit access.
+
+* Users can create one or more owned networks.
+* Users can list networks they own.
+* Users can search discoverable networks, including networks owned by other users where visibility policy allows it.
+* Search results for non-owned networks should expose only safe metadata until sharing rules are explicit.
+* Non-owned networks remain read-restricted or preview-only unless sharing has been explicitly enabled.
+* Only the owner can edit a network until a tested sharing permission model exists.
+
+UI tool model:
+
+The graph UI should evolve from a small left toolbox into a richer tool surface grouped by workflow. Permanent deletion should not be the default action; archive should be the normal destructive operation.
+
+Navigation tools:
+
+* Center graph
+* Center selection
+* Zoom in
+* Zoom out
+* Reset zoom
+* Fit all nodes
+* Fit selection
+
+Selection tools:
+
+* Select node
+* Multi-select
+* Select connected nodes
+* Select same type
+* Select entire family
+* Select entire organization
+* Invert selection
+* Clear selection
+
+Graph tools:
+
+* Create link
+* Delete link
+* Hide selected
+* Show hidden
+* Collapse branch
+* Expand branch
+* Auto layout
+* Lock node
+* Unlock node
+
+Data tools:
+
+* Create person
+* Create organization
+* Create family
+* Create event
+* Create project
+* Create location
+* Create tag
+* Edit
+* Duplicate
+* Archive
+* Delete as an explicit advanced action, not the default destructive action
+
+Search and path finding:
+
+* Keep the current search field.
+* Add path finding between two people or entities.
+* Path finding should use Neo4j graph traversal and present readable paths such as `Jonas -> Jarltech -> Kalle -> Kajsa`.
+
+Analysis tools for later versions:
+
+These are not required for 1.0 unless explicitly pulled forward.
+
+* Most connected person
+* Most connected organization
+* Orphan nodes
+* Duplicate candidates
+* Recently added
+* Recently modified
 
 0.1 Development
 
@@ -960,6 +1041,23 @@ Add user-owned networks and duplicate-aware person creation.
 Scope:
 This version introduces networks as first-class user-owned graph contexts. A user can create one or more networks, add existing or new people to a network, and keep network-specific notes and context separate from global person identity. Person creation should detect possible duplicates and suggest matches before creating a new global person. When duplicates are confirmed, MATE should support merging entities while preserving network ownership rules and moving non-conflicting properties to the surviving entity.
 
+Current implementation status:
+
+* First backend slice is implemented:
+  * user-owned Network nodes
+  * owner-only network visibility and write checks
+  * network person membership and network-specific context
+  * network-scoped graph loading
+  * network-scoped graph positions
+  * duplicate person suggestion endpoint
+  * conservative person merge endpoint for unambiguous owned-network cases
+* First frontend slice is implemented:
+  * network selector
+  * create network flow
+  * person creation through the selected network
+  * duplicate suggestion prompt before creating a new global person
+* Remaining 0.9 work should focus on deeper UI flows, create/list/search networks, richer duplicate matching inputs, organization/network context, explicit merge review for ambiguous cross-network cases, and broader automated tests.
+
 Implementation checklist:
 
 * Add Network model.
@@ -969,6 +1067,7 @@ Implementation checklist:
 
   * create network
   * list networks visible to current user
+  * search discoverable networks, including networks not owned by the current user
   * get network
   * update network metadata
   * archive network
@@ -984,6 +1083,7 @@ Implementation checklist:
 
   * GET /api/v1/networks
   * POST /api/v1/networks
+  * GET /api/v1/networks/search?q=...
   * GET /api/v1/networks/{id}
   * PUT /api/v1/networks/{id}
   * POST /api/v1/networks/{id}/archive
@@ -997,6 +1097,9 @@ Implementation checklist:
   * POST /api/v1/persons/{id}/merge
 * Add frontend view for selecting a network.
 * Add frontend flow for creating a network.
+* Add frontend view for showing owned networks.
+* Add frontend search for discoverable networks beyond the current user's own networks.
+* Ensure network search results do not allow editing non-owned networks.
 * Make graph load through the selected network context.
 * Keep global person identity separate from network-specific fields.
 * Move network-specific notes, relationship context, and graph layout out of the global person record where appropriate.
@@ -1033,6 +1136,7 @@ Implementation checklist:
 * Add service-level permission checks for every network-scoped write.
 * Ensure users only see their own network data unless sharing is explicitly enabled.
 * Ensure users who do not own a network cannot edit it.
+* Allow users to search discoverable networks without granting edit permissions.
 * Keep sharing model explicit but minimal in 0.9; full sharing UI can come later.
 * Update docs/api.md for networks and duplicate suggestions.
 * Update docs/storage.md and docs/neo4j.md for network schema.
@@ -1041,6 +1145,7 @@ Acceptance criteria:
 
 * Authenticated user can create a network.
 * Authenticated user can list their own networks.
+* Authenticated user can search discoverable networks beyond their own.
 * Authenticated user can open their own network.
 * Authenticated user can add a person to a network.
 * A person can appear in more than one network.
@@ -1056,6 +1161,7 @@ Acceptance criteria:
 * Merge does not allow a user to modify networks they do not own.
 * Ambiguous cross-network merges are blocked or converted to a review/proposal state until policy is decided.
 * Non-owner cannot edit another user's network.
+* Search results for another user's network do not grant edit access.
 * Users do not see other users' networks by default.
 
 Test checklist:
@@ -1063,6 +1169,9 @@ Test checklist:
 * Create a network as owner account.
 * Create a second network as the same account.
 * Confirm both networks are listed for the owner.
+* Search for networks and confirm owned networks appear.
+* Create a second user's network and confirm it can only appear in search according to discoverability rules.
+* Confirm search results for non-owned networks cannot be edited.
 * Add an existing person to both networks.
 * Add different notes/context for the same person in each network.
 * Confirm global person identity remains shared while network context differs.
@@ -1139,6 +1248,24 @@ Test checklist:
 * Test network endpoints without login.
 * Test network endpoints as non-owner.
 * Test direct API write attempts against another user's network.
+* Test owned network search.
+* Test discoverable network search beyond owned networks.
+* Test non-owned network search result does not grant read access when sharing is not enabled.
+* Test non-owned network search result does not grant write access.
+* Test network search without login returns `401`.
+* Test network search as viewer returns safe metadata only.
+* Test network search result shape does not leak private graph data, person notes, relationship notes, or positions.
+* Test create network from UI.
+* Test list owned networks from UI.
+* Test search networks from UI.
+* Test selected network persists across reload when still accessible.
+* Test selected network falls back cleanly when archived or inaccessible.
+* Test empty-network state.
+* Test no-network state for a viewer account with no owned networks.
+* Test create person through selected network.
+* Test add existing global person to selected network.
+* Test network-specific context edit for a person.
+* Test archive person membership without deleting global person.
 * Test duplicate matching by name.
 * Test duplicate matching by nickname.
 * Test duplicate matching by organization.
@@ -1152,6 +1279,8 @@ Test checklist:
 * Test ambiguous cross-network merge behavior.
 * Test frontend network selection.
 * Test frontend create-person duplicate suggestion flow.
+* Test duplicate suggestion flow where user links to an existing person.
+* Test duplicate suggestion flow where user creates a new person anyway.
 * Restart MATE and verify network data persists.
 
 Documentation checklist:
@@ -1168,7 +1297,7 @@ Goal:
 Continue product development after network ownership and duplicate detection are stabilized.
 
 Scope:
-This version develops smarter relationship semantics, entity taxonomy, and graph presentation after network ownership is stabilized. Link type options should depend on the broad entity types being linked, not only the current concrete labels. Users should be able to create custom relationship types when the built-in options are not enough. Person node color should reflect gender where known, while still preserving clear fallback colors.
+This version develops smarter relationship semantics, entity taxonomy, graph presentation, and the first richer UI tool groups after network ownership is stabilized. Link type options should depend on the broad entity types being linked, not only the current concrete labels. Users should be able to create custom relationship types when the built-in options are not enough. Person node color should reflect gender where known, while still preserving clear fallback colors.
 
 Implementation checklist:
 
@@ -1192,6 +1321,45 @@ Implementation checklist:
 * Add structured relationship attributes for role/context where needed, such as `role`, `start_date`, `end_date`, `current`, and notes.
 * Support relationship role examples such as Sales Manager, Developer, Chairman, and Teacher on work or membership relationships.
 * Update relationship creation UI to present type-aware options, custom creation, and relationship attributes when relevant.
+* Begin replacing the current simple toolbox with grouped tool areas:
+
+  * Navigation
+  * Selection
+  * Graph
+  * Data
+* Add navigation tools where feasible:
+
+  * fit all nodes
+  * center graph
+  * zoom in
+  * zoom out
+  * reset zoom
+  * fit selection after multi-select exists
+* Add first selection tools:
+
+  * select node
+  * multi-select
+  * select connected nodes
+  * clear selection
+* Add first graph tools:
+
+  * create link
+  * delete link
+  * hide selected
+  * show hidden
+  * auto layout
+* Add first data tools:
+
+  * create person
+  * create organization
+  * create family if family modeling has been decided
+  * create event if event modeling has been decided
+  * create project if Project is pulled into this version
+  * create location and create tag if their taxonomy decision supports graph entities
+  * edit
+  * duplicate
+  * archive
+* Keep delete as an explicit advanced action and prefer archive in normal UI flows.
 * Color person nodes by gender where known:
 
   * female/person with gender `f`: pink
@@ -1208,6 +1376,10 @@ Acceptance criteria:
 * User can create a custom relationship type when no built-in type fits.
 * Custom relationship types obey ownership/network permission rules.
 * Relationship attributes can store role/context for links such as `works_at`.
+* The UI exposes at least one useful grouped tool area beyond the existing toolbox.
+* Fit all nodes remains easy to access.
+* Multi-select and select connected nodes work for normal graph exploration.
+* Archive is easier to reach than permanent delete.
 * A person with gender `f` renders pink.
 * A person with gender `m` renders blue.
 * Other or unknown gender still renders clearly.
@@ -1226,6 +1398,11 @@ Test checklist:
 * Test custom relationship type creation.
 * Test custom relationship type reuse.
 * Test relationship attributes such as role on `works_at`.
+* Test grouped tool rendering.
+* Test fit all nodes.
+* Test multi-select.
+* Test select connected nodes from one selected node.
+* Test hide selected and show hidden if implemented in this version.
 * Test non-owner cannot create or modify custom relationship types for a network they do not own.
 * Test female person node renders pink.
 * Test male person node renders blue.
@@ -1238,6 +1415,124 @@ Documentation checklist:
 * Update docs/storage.md with entity taxonomy, relationship attributes, and custom relationship type storage rules.
 * Update docs/neo4j.md with relationship type metadata schema and any Project/Event/Family modeling decisions.
 * Update frontend smoke test documentation for type-aware links, relationship attributes, and gender colors.
+
+0.12 Debug
+
+Goal:
+Stabilize entity taxonomy, type-aware relationship behavior, gender coloring, and grouped UI tools from 0.11.
+
+Scope:
+This version tests and hardens the 0.11 development work before more product features are added. Focus on regressions in graph manipulation, predictable tool behavior, relationship type filtering, custom relationship types, relationship attributes, taxonomy choices, and network permission boundaries.
+
+Implementation checklist:
+
+* Add focused tests for entity taxonomy decisions.
+* Add focused tests for type-aware relationship options.
+* Add focused tests for custom relationship type storage and permission rules.
+* Add focused tests for relationship attributes.
+* Add frontend tests or repeatable smoke checks for grouped tools.
+* Add frontend tests or smoke checks for multi-select and selection commands.
+* Add frontend tests or smoke checks for graph tools such as hide/show and auto layout.
+* Add frontend tests or smoke checks for data tools such as duplicate and archive.
+* Confirm delete remains advanced and archive remains the normal destructive action.
+* Confirm gender coloring is accessible and does not break node state styling.
+* Confirm every new tool respects selected network ownership.
+* Confirm non-owners cannot use tools to mutate another user's network.
+* Update docs after debug findings.
+
+Acceptance criteria:
+
+* Relationship type options are stable and predictable for supported source/target pairs.
+* Irrelevant relationship types are hidden or disabled.
+* Custom relationship types can be created, reused, and permission-checked.
+* Relationship attributes persist and render where implemented.
+* Grouped tools render consistently in desktop and narrow layouts.
+* Navigation tools do not move or resize nodes unexpectedly.
+* Fit all nodes remains the primary visible graph framing action.
+* Multi-select does not break single-node selection or inspector behavior.
+* Select connected nodes selects exactly the expected immediate neighbors.
+* Hide/show selected works without data loss.
+* Auto layout does not overwrite locked nodes.
+* Lock/unlock behavior is deterministic if implemented.
+* Data tools use archive by default instead of permanent delete.
+* Person gender colors render correctly and remain accessible.
+* Network ownership boundaries still hold for every graph and data tool.
+
+Test checklist:
+
+* Run go test ./...
+* Run go vet ./...
+* Run frontend JavaScript syntax checks.
+* Test person-to-person relationship type filtering.
+* Test person-to-organization relationship type filtering.
+* Test organization-to-person relationship type filtering.
+* Test organization-to-organization relationship type filtering.
+* Test person-to-project relationship type filtering if Project is implemented.
+* Test organization-to-project relationship type filtering if Project is implemented.
+* Test custom relationship type creation.
+* Test custom relationship type reuse.
+* Test custom relationship type permission boundaries.
+* Test relationship attributes such as role, start date, end date, current, and notes.
+* Test grouped Navigation tools:
+
+  * center graph
+  * center selection
+  * zoom in
+  * zoom out
+  * reset zoom
+  * fit all nodes
+  * fit selection
+* Test grouped Selection tools:
+
+  * select node
+  * multi-select
+  * select connected nodes
+  * select same type
+  * select entire family if Family is implemented
+  * select entire organization
+  * invert selection
+  * clear selection
+* Test grouped Graph tools:
+
+  * create link
+  * delete link
+  * hide selected
+  * show hidden
+  * collapse branch
+  * expand branch
+  * auto layout
+  * lock node
+  * unlock node
+* Test grouped Data tools:
+
+  * create person
+  * create organization
+  * create family if implemented
+  * create event if implemented
+  * create project if implemented
+  * create location if implemented
+  * create tag if implemented
+  * edit
+  * duplicate
+  * archive
+  * delete only through explicit advanced action
+* Test node colors:
+
+  * female person renders pink
+  * male person renders blue
+  * other or unknown gender renders fallback color
+  * selected, hover, hidden, and locked states remain visible
+* Test that a non-owner cannot use any 0.11 UI tool to edit another user's network by direct API call.
+* Test browser reload after using grouped tools.
+* Test persistence after restart for custom relationship types, relationship attributes, layout changes, hidden/collapsed state if persisted, locks if persisted, and archive actions.
+
+Documentation checklist:
+
+* docs/api.md updated after type-aware relationship and custom relationship debug findings.
+* docs/storage.md updated after taxonomy and relationship attribute debug findings.
+* docs/neo4j.md updated after custom relationship type and tool-state debug findings.
+* docs/frontend-smoke-test.md updated for grouped tools.
+* docs/accounts.md updated if any tool-level permission behavior changes.
 
 1.0 Stable
 
@@ -1286,6 +1581,8 @@ Implementation checklist:
 * Finalize login, logout, session, and owner bootstrap flows.
 * Finalize role based permissions for owner, admin, editor, and viewer.
 * Finalize account management for owner.
+* Finalize create-account window for owners.
+* Finalize admin window for account management, role changes, and disabled accounts.
 * Finalize person profile page.
 * Finalize organization profile page.
 * Finalize basic create/edit/view flows.
@@ -1305,6 +1602,8 @@ Acceptance criteria:
 * User must log in to use MATE after accounts are configured.
 * First local owner account can be created through bootstrap.
 * Owner can create, update, and disable other accounts.
+* Owner can manage accounts through the admin UI.
+* Owner can create accounts through a create-account window.
 * Role permissions are enforced consistently.
 * User can create and view persons.
 * User can create and view companies.
@@ -1345,6 +1644,8 @@ Test checklist:
 * Test sample database.
 * Test login and logout.
 * Test account role permissions.
+* Test create-account window.
+* Test admin account-management window.
 * Test invalid API input.
 * Test frontend with API failure.
 * Test browser reload.
@@ -1370,6 +1671,8 @@ Future 1.x
 1.1 Development
 
 * Improve account management workflows.
+* Add create-account window if it was not completed before 1.0.
+* Add account admin window if it was not completed before 1.0.
 * Add password change flow.
 * Add account recovery or reset strategy for local owner account.
 * Add optional user profile or owner profile.
@@ -1377,6 +1680,7 @@ Future 1.x
 * Add environment variable support.
 * Add optional config file support if needed.
 * Add search.
+* Add path finding between two people or entities using Neo4j traversal.
 * Add tag filtering.
 * Add better graph filtering.
 * Add relationship notes.
@@ -1388,10 +1692,12 @@ Future 1.x
 
 * Stabilize account management improvements.
 * Stabilize search.
+* Stabilize path finding.
 * Stabilize filtering.
 * Stabilize timeline.
 * Add tests for account management improvements.
 * Add tests for search.
+* Add tests for path finding.
 * Add tests for filtering.
 * Update documentation.
 
@@ -1420,6 +1726,14 @@ Future 1.x
 * Add manual graph layout saving.
 * Add grouping by organization.
 * Add grouping by family.
+* Add analysis tools:
+
+  * most connected person
+  * most connected organization
+  * orphan nodes
+  * duplicate candidates
+  * recently added
+  * recently modified
 * Add grouping by school.
 * Add grouping by location.
 * Add visual filters.

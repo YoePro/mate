@@ -21,6 +21,22 @@ type Storage interface {
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (*models.Session, error)
 	DeleteSession(ctx context.Context, tokenHash string) error
 
+	CreateNetwork(ctx context.Context, network models.Network) (*models.Network, error)
+	GetNetwork(ctx context.Context, id string) (*models.Network, error)
+	ListNetworksForAccount(ctx context.Context, accountID string) ([]models.Network, error)
+	SearchNetworks(ctx context.Context, accountID string, query string) ([]models.NetworkSearchResult, error)
+	UpdateNetwork(ctx context.Context, network models.Network) (*models.Network, error)
+	ArchiveNetwork(ctx context.Context, id string) error
+	AddPersonToNetwork(ctx context.Context, context models.NetworkPersonContext) (*models.NetworkPersonContext, error)
+	GetNetworkPerson(ctx context.Context, networkID string, personID string) (*models.NetworkPerson, error)
+	ListNetworkPersons(ctx context.Context, networkID string) ([]models.NetworkPerson, error)
+	UpdateNetworkPersonContext(ctx context.Context, context models.NetworkPersonContext) (*models.NetworkPersonContext, error)
+	ArchiveNetworkPerson(ctx context.Context, networkID string, personID string) error
+	SaveNetworkPosition(ctx context.Context, networkID string, position models.Position) error
+	GetNetworkGraph(ctx context.Context, networkID string) (*models.NetworkGraphResponse, error)
+	ListPersonNetworkIDs(ctx context.Context, personID string) ([]string, error)
+	MergePersons(ctx context.Context, survivorID string, removedID string) (*models.Person, error)
+
 	CreatePerson(ctx context.Context, person models.Person) (*models.Person, error)
 	GetPerson(ctx context.Context, id string) (*models.Person, error)
 	ListPersons(ctx context.Context) ([]models.Person, error)

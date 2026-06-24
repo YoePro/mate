@@ -54,11 +54,15 @@ function localOnlyWarning(action, err) {
 // ---- Boot ----
 
 let currentAccount = null;
+let currentNetwork = null;
+let ownedNetworks = [];
+window.currentNetworkId = null;
 
 async function boot() {
   currentAccount = await requireAccount();
   if (!currentAccount) return;
 
+  await initNetworks();
   initToolbox();
   initInspector();
   initModals();
@@ -94,6 +98,13 @@ async function boot() {
 async function loadGraph() {
   setStatus('loading');
   try {
+    if (!window.currentNetworkId) {
+      graph.clear();
+      renderAllNodes();
+      renderAllLinks();
+      setStatus('ok');
+      return;
+    }
     const data = await apiLoadAll();
     graph.load(data);
     renderAllNodes();
@@ -103,6 +114,158 @@ async function loadGraph() {
     console.error('Failed to load graph:', err);
     setStatus('error');
   }
+}
+
+async function initNetworks() {
+  const select = el('network-select');
+  const createBtn = el('btn-new-network');
+  createBtn.addEventListener('click', handleCreateNetwork);
+  select.addEventListener('change', async () => {
+    const selected = ownedNetworks.find(n => n.id === select.value);
+    setCurrentNetwork(selected || null);
+    await loadGraph();
+  });
+  initNetworkSearch();
+  await refreshNetworks();
+}
+
+async function refreshNetworks() {
+  ownedNetworks = await apiListNetworks();
+  if (!ownedNetworks.length && currentAccount && currentAccount.role !== 'viewer') {
+    const created = await apiCreateNetwork({ name: 'Default network' });
+    ownedNetworks.push(created);
+  }
+  const savedID = window.localStorage.getItem('mate.currentNetworkId');
+  const selected = ownedNetworks.find(n => n.id === savedID) || ownedNetworks[0] || null;
+  renderNetworkOptions(ownedNetworks, selected ? selected.id : '');
+  setCurrentNetwork(selected);
+}
+
+function renderNetworkOptions(networks, selectedID) {
+  const select = el('network-select');
+  clearChildren(select);
+  if (!networks.length) {
+    const option = createEl('option', '');
+    option.value = '';
+    option.textContent = 'No networks';
+    select.appendChild(option);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  networks.forEach(network => {
+    const option = createEl('option', '');
+    option.value = network.id;
+    option.textContent = network.name;
+    option.selected = network.id === selectedID;
+    select.appendChild(option);
+  });
+}
+
+function setCurrentNetwork(network) {
+  currentNetwork = network;
+  window.currentNetworkId = network ? network.id : null;
+  if (window.currentNetworkId) {
+    window.localStorage.setItem('mate.currentNetworkId', window.currentNetworkId);
+  } else {
+    window.localStorage.removeItem('mate.currentNetworkId');
+  }
+}
+
+async function handleCreateNetwork() {
+  const name = prompt('Network name');
+  if (!name || !name.trim()) return;
+  try {
+    const network = await apiCreateNetwork({ name: name.trim() });
+    ownedNetworks = await apiListNetworks();
+    renderNetworkOptions(ownedNetworks, network.id);
+    setCurrentNetwork(network);
+    graph.selectNode(null);
+    await loadGraph();
+  } catch (err) {
+    console.error('Network create failed:', err);
+    alert('Could not create network.');
+  }
+}
+
+function initNetworkSearch() {
+  const input = el('network-search-input');
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const query = input.value.trim();
+    if (query.length < 2) {
+      removeNetworkResults();
+      return;
+    }
+    timer = setTimeout(async () => {
+      try {
+        const results = await apiSearchNetworks(query);
+        showNetworkResults(results);
+      } catch (err) {
+        console.warn('Network search failed:', err.message);
+        removeNetworkResults();
+      }
+    }, 180);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      input.value = '';
+      removeNetworkResults();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const wrap = input.closest('.network-search-wrap');
+    if (wrap && !wrap.contains(e.target)) removeNetworkResults();
+  });
+}
+
+function showNetworkResults(results) {
+  removeNetworkResults();
+  const input = el('network-search-input');
+  const wrap = input.closest('.network-search-wrap');
+  const box = createEl('div', 'network-results');
+  if (!results.length) {
+    const empty = createEl('button', 'network-result-item');
+    empty.type = 'button';
+    empty.disabled = true;
+    empty.textContent = 'No matching networks';
+    box.appendChild(empty);
+  }
+  results.forEach(result => {
+    const item = createEl('button', 'network-result-item');
+    item.type = 'button';
+    item.disabled = !result.owned;
+    const name = createEl('span', 'network-result-name');
+    name.textContent = result.name || 'Untitled network';
+    const meta = createEl('span', 'network-result-meta');
+    meta.textContent = result.owned ? 'Owned by you' : 'Discoverable - no access';
+    item.appendChild(name);
+    item.appendChild(meta);
+    if (result.description) {
+      const desc = createEl('span', 'network-result-meta');
+      desc.textContent = result.description;
+      item.appendChild(desc);
+    }
+    if (result.owned) {
+      item.addEventListener('click', async () => {
+        const selected = ownedNetworks.find(n => n.id === result.id);
+        if (!selected) return;
+        renderNetworkOptions(ownedNetworks, selected.id);
+        setCurrentNetwork(selected);
+        input.value = '';
+        removeNetworkResults();
+        graph.selectNode(null);
+        await loadGraph();
+      });
+    }
+    box.appendChild(item);
+  });
+  wrap.appendChild(box);
+}
+
+function removeNetworkResults() {
+  qsa('.network-results').forEach(node => node.remove());
 }
 
 function setStatus(state) {
@@ -547,6 +710,12 @@ async function handleModalSave() {
         result = createTemporaryEntity(modalEntityType, data);
       } else {
         try {
+          if (modalEntityType === 'person' && window.currentNetworkId) {
+            const existing = await maybeUseExistingPerson(data);
+            if (existing) {
+              data.id = existing.id;
+            }
+          }
           result = await apiCreate(modalEntityType, data);
           await apiSavePosition(result.id, modalEntityType, modalX, modalY);
         } catch (err) {
@@ -572,6 +741,17 @@ async function handleModalSave() {
     el('modal-save').disabled = false;
     el('modal-save').textContent = 'Save';
   }
+}
+
+async function maybeUseExistingPerson(data) {
+  if (!data.name && !data.nickname) return null;
+  const matches = await apiPersonMatches({ name: data.name || '', nickname: data.nickname || '' });
+  if (!matches.length) return null;
+  const top = matches[0];
+  const reasons = (top.reasons || []).join(', ') || 'possible duplicate';
+  const confidence = Math.round((top.confidence || 0) * 100);
+  const message = `Possible match: ${top.person.name} (${confidence}%, ${reasons}).\n\nLink this person to the selected network instead of creating a new global person?`;
+  return confirm(message) ? top.person : null;
 }
 
 async function handleModalDelete() {

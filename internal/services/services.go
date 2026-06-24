@@ -17,6 +17,7 @@ type Services struct {
 	Relationships *RelationshipService
 	Graph         *GraphService
 	Accounts      *AccountService
+	Networks      *NetworkService
 }
 
 // New creates all application services.
@@ -27,6 +28,7 @@ func New(store storage.Storage) *Services {
 		Relationships: &RelationshipService{store: store},
 		Graph:         &GraphService{store: store},
 		Accounts:      &AccountService{store: store},
+		Networks:      &NetworkService{store: store},
 	}
 }
 

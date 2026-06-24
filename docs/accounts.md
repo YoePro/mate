@@ -1,6 +1,6 @@
 # Accounts And Login
 
-MATE 0.7 has persisted accounts, roles, login sessions, and a browser login page.
+MATE has persisted accounts, roles, login sessions, and a browser login page.
 
 ## Browser flow
 
@@ -49,3 +49,13 @@ Successful login sets a HTTP-only `mate_session` cookie. Logout deletes the pers
 - Account management requires `owner`.
 - Direct API calls by unauthenticated users return `401`.
 - Direct API write calls by `viewer` return `403`.
+
+## Network ownership
+
+MATE 0.9 adds user-owned networks.
+
+- Each network has one owner account.
+- Users only list and open networks they own.
+- Network writes require both a write-capable role and network ownership.
+- Non-owners cannot edit a network by direct API call.
+- Full sharing and delegated edit permissions are intentionally not implemented yet.

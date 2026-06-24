@@ -7,6 +7,10 @@ import (
 	"mate/internal/models"
 )
 
+type personMergeRequest struct {
+	RemovedPersonID string `json:"removed_person_id"`
+}
+
 // ListPersons returns all persons.
 func ListPersons(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -116,9 +120,42 @@ func (api *API) personNested(w http.ResponseWriter, r *http.Request, personID st
 		api.personProfile(w, r, personID)
 	case "attributes":
 		api.personAttributes(w, r, personID, parts[1:])
+	case "merge":
+		if len(parts) != 1 {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		api.personMerge(w, r, personID)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
+}
+
+func (api *API) personMerge(w http.ResponseWriter, r *http.Request, survivorID string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := api.requireDataWrite(r); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	actor, err := api.currentAccount(r)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	var req personMergeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	result, err := api.services.Networks.MergePersons(r.Context(), actor, survivorID, req.RemovedPersonID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (api *API) personProfile(w http.ResponseWriter, r *http.Request, personID string) {
@@ -204,6 +241,10 @@ func (api *API) personAttributes(w http.ResponseWriter, r *http.Request, personI
 
 	if r.Method != http.MethodPut {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := api.requireDataWrite(r); err != nil {
+		writeServiceError(w, err)
 		return
 	}
 	var attribute models.PersonAttribute

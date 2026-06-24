@@ -55,6 +55,8 @@ func (s *Storage) EnsureSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT mate_organization_id IF NOT EXISTS FOR (o:Organization) REQUIRE o.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_organization_attribute_id IF NOT EXISTS FOR (a:OrganizationAttribute) REQUIRE a.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_position_key IF NOT EXISTS FOR (p:Position) REQUIRE (p.node_id, p.node_type) IS UNIQUE",
+		"CREATE CONSTRAINT mate_network_id IF NOT EXISTS FOR (n:Network) REQUIRE n.id IS UNIQUE",
+		"CREATE CONSTRAINT mate_network_position_key IF NOT EXISTS FOR (p:NetworkPosition) REQUIRE (p.network_id, p.node_id, p.node_type) IS UNIQUE",
 	}
 
 	for _, statement := range statements {
@@ -283,6 +285,416 @@ func (s *Storage) getAccount(ctx context.Context, prefix string, params map[stri
 		return nil, err
 	}
 	return value.(*models.Account), nil
+}
+
+// CreateNetwork creates a user-owned network.
+func (s *Storage) CreateNetwork(ctx context.Context, network models.Network) (*models.Network, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkReturnQuery(`
+			MATCH (a:Account {id: $owner_id})
+			CREATE (a)-[:OWNS_NETWORK]->(n:Network {
+				id: $id,
+				owner_id: $owner_id,
+				name: $name,
+				description: $description,
+				archived: false
+			})`),
+			networkParams(network),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		created := networkFromRecord(record)
+		return &created, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Network), nil
+}
+
+// GetNetwork returns one network.
+func (s *Storage) GetNetwork(ctx context.Context, id string) (*models.Network, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkReturnQuery("MATCH (n:Network {id: $id})"), map[string]any{"id": id})
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		network := networkFromRecord(record)
+		return &network, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Network), nil
+}
+
+// ListNetworksForAccount returns non-archived networks owned by an account.
+func (s *Storage) ListNetworksForAccount(ctx context.Context, accountID string) ([]models.Network, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkReturnQuery(`
+			MATCH (:Account {id: $account_id})-[:OWNS_NETWORK]->(n:Network)
+			WHERE coalesce(n.archived, false) = false`)+" ORDER BY toLower(n.name)",
+			map[string]any{"account_id": accountID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		networks := make([]models.Network, 0)
+		for result.Next(ctx) {
+			networks = append(networks, networkFromRecord(result.Record()))
+		}
+		return networks, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Network), nil
+}
+
+// SearchNetworks returns safe network metadata matching a query.
+func (s *Storage) SearchNetworks(ctx context.Context, accountID string, query string) ([]models.NetworkSearchResult, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (n:Network)
+			WHERE coalesce(n.archived, false) = false
+			  AND (
+			    toLower(n.name) CONTAINS toLower($query)
+			    OR toLower(coalesce(n.description, '')) CONTAINS toLower($query)
+			  )
+			RETURN n.id AS id,
+			       n.name AS name,
+			       n.description AS description,
+			       n.owner_id = $account_id AS owned,
+			       n.owner_id = $account_id AS can_edit
+			ORDER BY owned DESC, toLower(n.name)
+			LIMIT 25`,
+			map[string]any{"account_id": accountID, "query": query},
+		)
+		if err != nil {
+			return nil, err
+		}
+		networks := make([]models.NetworkSearchResult, 0)
+		for result.Next(ctx) {
+			record := result.Record()
+			networks = append(networks, models.NetworkSearchResult{
+				ID:          asString(record, "id"),
+				Name:        asString(record, "name"),
+				Description: asString(record, "description"),
+				Owned:       asBool(record, "owned"),
+				CanEdit:     asBool(record, "can_edit"),
+			})
+		}
+		return networks, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.NetworkSearchResult), nil
+}
+
+// UpdateNetwork updates network metadata.
+func (s *Storage) UpdateNetwork(ctx context.Context, network models.Network) (*models.Network, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkReturnQuery(`
+			MATCH (n:Network {id: $id})
+			SET n.name = $name,
+			    n.description = $description`),
+			networkParams(network),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		updated := networkFromRecord(record)
+		return &updated, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Network), nil
+}
+
+// ArchiveNetwork archives a network.
+func (s *Storage) ArchiveNetwork(ctx context.Context, id string) error {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (n:Network {id: $id})
+			SET n.archived = true
+			RETURN count(n) AS archived`,
+			map[string]any{"id": id},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if asInt(record, "archived") == 0 {
+			return nil, storage.ErrNotFound
+		}
+		return nil, nil
+	})
+	return err
+}
+
+// AddPersonToNetwork links a person to a network with network-specific context.
+func (s *Storage) AddPersonToNetwork(ctx context.Context, context models.NetworkPersonContext) (*models.NetworkPersonContext, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkPersonContextReturnQuery(`
+			MATCH (n:Network {id: $network_id})
+			MATCH (p:Person {id: $person_id})
+			MERGE (n)-[r:CONTAINS_PERSON]->(p)
+			SET r.network_id = $network_id,
+			    r.person_id = $person_id,
+			    r.notes = $notes,
+			    r.context = $context,
+			    r.archived = false`),
+			networkPersonContextParams(context),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		created := networkPersonContextFromRecord(record)
+		return &created, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.NetworkPersonContext), nil
+}
+
+// GetNetworkPerson returns one person within a network.
+func (s *Storage) GetNetworkPerson(ctx context.Context, networkID string, personID string) (*models.NetworkPerson, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkPersonReturnQuery(`
+			MATCH (:Network {id: $network_id})-[r:CONTAINS_PERSON]->(p:Person {id: $person_id})
+			WHERE coalesce(r.archived, false) = false`),
+			map[string]any{"network_id": networkID, "person_id": personID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		person := networkPersonFromRecord(record)
+		return &person, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.NetworkPerson), nil
+}
+
+// ListNetworkPersons lists persons in a network.
+func (s *Storage) ListNetworkPersons(ctx context.Context, networkID string) ([]models.NetworkPerson, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkPersonReturnQuery(`
+			MATCH (:Network {id: $network_id})-[r:CONTAINS_PERSON]->(p:Person)
+			WHERE coalesce(r.archived, false) = false`)+" ORDER BY toLower(p.name)",
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		persons := make([]models.NetworkPerson, 0)
+		for result.Next(ctx) {
+			persons = append(persons, networkPersonFromRecord(result.Record()))
+		}
+		return persons, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.NetworkPerson), nil
+}
+
+// UpdateNetworkPersonContext updates network-specific person context.
+func (s *Storage) UpdateNetworkPersonContext(ctx context.Context, context models.NetworkPersonContext) (*models.NetworkPersonContext, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, networkPersonContextReturnQuery(`
+			MATCH (:Network {id: $network_id})-[r:CONTAINS_PERSON]->(:Person {id: $person_id})
+			WHERE coalesce(r.archived, false) = false
+			SET r.notes = $notes,
+			    r.context = $context`),
+			networkPersonContextParams(context),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		updated := networkPersonContextFromRecord(record)
+		return &updated, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.NetworkPersonContext), nil
+}
+
+// ArchiveNetworkPerson archives a person's membership in a network.
+func (s *Storage) ArchiveNetworkPerson(ctx context.Context, networkID string, personID string) error {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[r:CONTAINS_PERSON]->(:Person {id: $person_id})
+			SET r.archived = true
+			RETURN count(r) AS archived`,
+			map[string]any{"network_id": networkID, "person_id": personID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if asInt(record, "archived") == 0 {
+			return nil, storage.ErrNotFound
+		}
+		return nil, nil
+	})
+	return err
+}
+
+// SaveNetworkPosition stores a node position scoped to a network.
+func (s *Storage) SaveNetworkPosition(ctx context.Context, networkID string, position models.Position) error {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		_, err := tx.Run(ctx, `
+			MATCH (n:Network {id: $network_id})
+			MERGE (p:NetworkPosition {network_id: $network_id, node_id: $node_id, node_type: $node_type})
+			SET p.x = $x, p.y = $y
+			MERGE (n)-[:HAS_POSITION]->(p)`,
+			map[string]any{
+				"network_id": networkID,
+				"node_id":    position.NodeID,
+				"node_type":  position.NodeType,
+				"x":          position.X,
+				"y":          position.Y,
+			},
+		)
+		return nil, err
+	})
+	return err
+}
+
+// GetNetworkGraph returns graph data scoped to one network.
+func (s *Storage) GetNetworkGraph(ctx context.Context, networkID string) (*models.NetworkGraphResponse, error) {
+	network, err := s.GetNetwork(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	persons, err := s.ListNetworkPersons(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	relationships, err := s.listNetworkRelationships(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	organizations, err := s.listNetworkOrganizations(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	positions, err := s.listNetworkPositions(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.NetworkGraphResponse{
+		Network:       *network,
+		Persons:       persons,
+		Organizations: organizations,
+		Relationships: relationships,
+		Positions:     positions,
+	}, nil
+}
+
+// ListPersonNetworkIDs lists active network memberships for a person.
+func (s *Storage) ListPersonNetworkIDs(ctx context.Context, personID string) ([]string, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (n:Network)-[r:CONTAINS_PERSON]->(:Person {id: $person_id})
+			WHERE coalesce(n.archived, false) = false AND coalesce(r.archived, false) = false
+			RETURN n.id AS network_id
+			ORDER BY n.id`,
+			map[string]any{"person_id": personID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0)
+		for result.Next(ctx) {
+			ids = append(ids, asString(result.Record(), "network_id"))
+		}
+		return ids, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]string), nil
+}
+
+// MergePersons merges removedID into survivorID and deletes the removed person.
+func (s *Storage) MergePersons(ctx context.Context, survivorID string, removedID string) (*models.Person, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (survivor:Person {id: $survivor_id})
+			MATCH (removed:Person {id: $removed_id})
+			SET survivor.nickname = CASE WHEN coalesce(survivor.nickname, '') = '' THEN removed.nickname ELSE survivor.nickname END,
+			    survivor.gender = CASE WHEN coalesce(survivor.gender, '') = '' THEN removed.gender ELSE survivor.gender END,
+			    survivor.title = CASE WHEN coalesce(survivor.title, '') = '' THEN removed.title ELSE survivor.title END,
+			    survivor.description = CASE WHEN coalesce(survivor.description, '') = '' THEN removed.description ELSE survivor.description END,
+			    survivor.notes = CASE WHEN coalesce(survivor.notes, '') = '' THEN removed.notes ELSE survivor.notes END,
+			    survivor.tags = CASE WHEN size(coalesce(survivor.tags, [])) = 0 THEN removed.tags ELSE survivor.tags END,
+			    survivor.deceased = coalesce(survivor.deceased, false) OR coalesce(removed.deceased, false)
+			RETURN survivor.id AS id, survivor.name AS name, survivor.nickname AS nickname, survivor.gender AS gender,
+			       survivor.title AS title, survivor.description AS description, survivor.notes AS notes,
+			       survivor.tags AS tags, survivor.deceased AS deceased`,
+			map[string]any{"survivor_id": survivorID, "removed_id": removedID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		if err := s.rewirePersonRelationships(ctx, tx, survivorID, removedID); err != nil {
+			return nil, err
+		}
+		if err := s.movePersonMergeData(ctx, tx, survivorID, removedID); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Run(ctx, "MATCH (removed:Person {id: $removed_id}) DETACH DELETE removed", map[string]any{"removed_id": removedID}); err != nil {
+			return nil, err
+		}
+		survivor := personFromRecord(record)
+		return &survivor, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Person), nil
 }
 
 // CreatePerson creates a person node.
@@ -988,6 +1400,170 @@ func (s *Storage) listPositions(ctx context.Context) ([]models.Position, error) 
 	return value.([]models.Position), nil
 }
 
+func (s *Storage) listNetworkRelationships(ctx context.Context, networkID string) ([]models.Relationship, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, relationshipReturnQuery(`
+			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			MATCH (source)-[r]->(target)
+			WHERE coalesce(membership.archived, false) = false
+			  AND r.id IS NOT NULL
+			  AND (source.id = person.id OR target.id = person.id)
+			  AND type(r) <> 'CONTAINS_PERSON'`),
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		relationships := make([]models.Relationship, 0)
+		for result.Next(ctx) {
+			relationship := relationshipFromRecord(result.Record())
+			if seen[relationship.ID] {
+				continue
+			}
+			seen[relationship.ID] = true
+			relationships = append(relationships, relationship)
+		}
+		return relationships, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Relationship), nil
+}
+
+func (s *Storage) listNetworkOrganizations(ctx context.Context, networkID string) ([]models.Organization, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, organizationReturnQuery(`
+			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			MATCH (person)-[r]-(o:Organization)
+			WHERE coalesce(membership.archived, false) = false
+			  AND r.id IS NOT NULL`)+" ORDER BY toLower(o.name)",
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		organizations := make([]models.Organization, 0)
+		for result.Next(ctx) {
+			organization := organizationFromRecord(result.Record())
+			if seen[organization.ID] {
+				continue
+			}
+			seen[organization.ID] = true
+			organizations = append(organizations, organization)
+		}
+		return organizations, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Organization), nil
+}
+
+func (s *Storage) listNetworkPositions(ctx context.Context, networkID string) ([]models.Position, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(p:NetworkPosition)
+			RETURN p.node_id AS node_id, p.node_type AS node_type, p.x AS x, p.y AS y`,
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		positions := make([]models.Position, 0)
+		for result.Next(ctx) {
+			record := result.Record()
+			positions = append(positions, models.Position{
+				NodeID:   asString(record, "node_id"),
+				NodeType: asString(record, "node_type"),
+				X:        asFloat(record, "x"),
+				Y:        asFloat(record, "y"),
+			})
+		}
+		return positions, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Position), nil
+}
+
+func (s *Storage) movePersonMergeData(ctx context.Context, tx driver.ManagedTransaction, survivorID string, removedID string) error {
+	statements := []string{
+		`
+		MATCH (removed:Person {id: $removed_id})-[:HAS_ATTRIBUTE]->(a:PersonAttribute)
+		MATCH (survivor:Person {id: $survivor_id})
+		MERGE (survivor)-[:HAS_ATTRIBUTE]->(a)
+		SET a.person_id = $survivor_id`,
+		`
+		MATCH (n:Network)-[r:CONTAINS_PERSON]->(:Person {id: $removed_id})
+		MATCH (survivor:Person {id: $survivor_id})
+		MERGE (n)-[existing:CONTAINS_PERSON]->(survivor)
+		SET existing.network_id = n.id,
+		    existing.person_id = $survivor_id,
+		    existing.notes = CASE WHEN coalesce(existing.notes, '') = '' THEN r.notes ELSE existing.notes END,
+		    existing.context = CASE WHEN coalesce(existing.context, '') = '' THEN r.context ELSE existing.context END,
+		    existing.archived = coalesce(existing.archived, r.archived, false)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Run(ctx, statement, map[string]any{"survivor_id": survivorID, "removed_id": removedID}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Storage) rewirePersonRelationships(ctx context.Context, tx driver.ManagedTransaction, survivorID string, removedID string) error {
+	types := []models.RelationshipType{
+		models.RelationshipKnows,
+		models.RelationshipSpouseOf,
+		models.RelationshipParentOf,
+		models.RelationshipSiblingOf,
+		models.RelationshipWorksAt,
+		models.RelationshipMemberOf,
+		models.RelationshipStudiedAt,
+		models.RelationshipLivesIn,
+		models.RelationshipHasTag,
+	}
+	for _, relType := range types {
+		if err := s.rewireOutgoingPersonRelationships(ctx, tx, relType, survivorID, removedID); err != nil {
+			return err
+		}
+		if err := s.rewireIncomingPersonRelationships(ctx, tx, relType, survivorID, removedID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Storage) rewireOutgoingPersonRelationships(ctx context.Context, tx driver.ManagedTransaction, relType models.RelationshipType, survivorID string, removedID string) error {
+	query := fmt.Sprintf(`
+		MATCH (removed:Person {id: $removed_id})-[r:%s]->(target)
+		WHERE r.id IS NOT NULL AND target.id <> $survivor_id
+		MATCH (survivor:Person {id: $survivor_id})
+		CREATE (survivor)-[copy:%s]->(target)
+		SET copy = properties(r),
+		    copy.source_id = $survivor_id
+		DELETE r`, relType, relType)
+	_, err := tx.Run(ctx, query, map[string]any{"survivor_id": survivorID, "removed_id": removedID})
+	return err
+}
+
+func (s *Storage) rewireIncomingPersonRelationships(ctx context.Context, tx driver.ManagedTransaction, relType models.RelationshipType, survivorID string, removedID string) error {
+	query := fmt.Sprintf(`
+		MATCH (source)-[r:%s]->(removed:Person {id: $removed_id})
+		WHERE r.id IS NOT NULL AND source.id <> $survivor_id
+		MATCH (survivor:Person {id: $survivor_id})
+		CREATE (source)-[copy:%s]->(survivor)
+		SET copy = properties(r),
+		    copy.target_id = $survivor_id
+		DELETE r`, relType, relType)
+	_, err := tx.Run(ctx, query, map[string]any{"survivor_id": survivorID, "removed_id": removedID})
+	return err
+}
+
 func (s *Storage) deleteNode(ctx context.Context, label, id string) error {
 	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, fmt.Sprintf(`
@@ -1055,6 +1631,26 @@ func sessionParams(session models.Session) map[string]any {
 		"account_id": session.AccountID,
 		"token_hash": session.TokenHash,
 		"expires_at": session.ExpiresAt,
+	}
+}
+
+func networkParams(network models.Network) map[string]any {
+	return map[string]any{
+		"id":          network.ID,
+		"owner_id":    network.OwnerID,
+		"name":        network.Name,
+		"description": network.Description,
+		"archived":    network.Archived,
+	}
+}
+
+func networkPersonContextParams(context models.NetworkPersonContext) map[string]any {
+	return map[string]any{
+		"network_id": context.NetworkID,
+		"person_id":  context.PersonID,
+		"notes":      context.Notes,
+		"context":    context.Context,
+		"archived":   context.Archived,
 	}
 }
 
@@ -1132,6 +1728,16 @@ func sessionFromRecord(record *driver.Record) models.Session {
 	}
 }
 
+func networkFromRecord(record *driver.Record) models.Network {
+	return models.Network{
+		ID:          asString(record, "id"),
+		OwnerID:     asString(record, "owner_id"),
+		Name:        asString(record, "name"),
+		Description: asString(record, "description"),
+		Archived:    asBool(record, "archived"),
+	}
+}
+
 func personFromRecord(record *driver.Record) models.Person {
 	return models.Person{
 		ID:          asString(record, "id"),
@@ -1143,6 +1749,23 @@ func personFromRecord(record *driver.Record) models.Person {
 		Notes:       asString(record, "notes"),
 		Tags:        asStringSlice(record, "tags"),
 		Deceased:    asBool(record, "deceased"),
+	}
+}
+
+func networkPersonContextFromRecord(record *driver.Record) models.NetworkPersonContext {
+	return models.NetworkPersonContext{
+		NetworkID: asString(record, "network_id"),
+		PersonID:  asString(record, "person_id"),
+		Notes:     asString(record, "context_notes"),
+		Context:   asString(record, "context"),
+		Archived:  asBool(record, "context_archived"),
+	}
+}
+
+func networkPersonFromRecord(record *driver.Record) models.NetworkPerson {
+	return models.NetworkPerson{
+		Person:  personFromRecord(record),
+		Context: networkPersonContextFromRecord(record),
 	}
 }
 
@@ -1206,6 +1829,29 @@ func accountReturnQuery(prefix string) string {
 	return prefix + `
 		RETURN a.id AS id, a.email AS email, a.display_name AS display_name,
 		       a.role AS role, a.disabled AS disabled, a.password_hash AS password_hash`
+}
+
+func networkReturnQuery(prefix string) string {
+	return prefix + `
+		RETURN n.id AS id, n.owner_id AS owner_id, n.name AS name,
+		       n.description AS description, n.archived AS archived`
+}
+
+func networkPersonContextReturnQuery(prefix string) string {
+	return prefix + `
+		RETURN r.network_id AS network_id, r.person_id AS person_id,
+		       r.notes AS context_notes, r.context AS context,
+		       r.archived AS context_archived`
+}
+
+func networkPersonReturnQuery(prefix string) string {
+	return prefix + `
+		RETURN p.id AS id, p.name AS name, p.nickname AS nickname, p.gender AS gender,
+		       p.title AS title, p.description AS description, p.notes AS notes,
+		       p.tags AS tags, p.deceased AS deceased,
+		       r.network_id AS network_id, r.person_id AS person_id,
+		       r.notes AS context_notes, r.context AS context,
+		       r.archived AS context_archived`
 }
 
 func organizationReturnQuery(prefix string) string {

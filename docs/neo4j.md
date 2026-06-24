@@ -21,6 +21,8 @@ MATE creates constraints for:
 - `Organization.id`
 - `OrganizationAttribute.id`
 - `Position.node_id` and `Position.node_type`
+- `Network.id`
+- `NetworkPosition.network_id`, `NetworkPosition.node_id`, and `NetworkPosition.node_type`
 
 Current graph labels:
 
@@ -31,8 +33,18 @@ Current graph labels:
 - `Organization`
 - `OrganizationAttribute`
 - `Position`
+- `Network`
+- `NetworkPosition`
 
 Relationship types are created from the supported MATE relationship types, such as `knows`, `works_at`, and `member_of`.
+
+Network relationships:
+
+- `(:Account)-[:OWNS_NETWORK]->(:Network)`
+- `(:Network)-[:CONTAINS_PERSON]->(:Person)`
+- `(:Network)-[:HAS_POSITION]->(:NetworkPosition)`
+
+`CONTAINS_PERSON` stores network-specific `notes`, `context`, and `archived` properties.
 
 ## Unavailable database behavior
 

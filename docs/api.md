@@ -124,7 +124,7 @@ Returns the authenticated account tied to the current session cookie.
 
 ## Accounts
 
-Account management requires an authenticated owner session. In 0.7 these endpoints are API-only; the browser UI has login/logout but not a full account management screen yet.
+Account management requires an authenticated owner session. These endpoints are API-only until the user admin UI is added.
 
 Supported roles are `owner`, `admin`, `editor`, and `viewer`.
 
@@ -166,6 +166,217 @@ Request:
 ### POST /api/v1/accounts/{id}/disable
 
 Disables an account.
+
+---
+
+## Networks
+
+Networks are user-owned graph contexts. Users only see their own networks. Network writes require a write-capable role and ownership of the network.
+
+### GET /api/v1/networks
+
+Returns networks owned by the current account.
+
+### POST /api/v1/networks
+
+Creates a network owned by the current account.
+
+Request:
+
+```json
+{
+  "name": "Family",
+  "description": "Close family and shared history"
+}
+```
+
+### GET /api/v1/networks/search?q={query}
+
+Searches discoverable networks by safe metadata. The response may include networks owned by other accounts, but search results do not grant read or edit access to the network graph.
+
+The query must be at least two characters.
+
+Response:
+
+```json
+[
+  {
+    "id": "network-123",
+    "name": "Family",
+    "description": "Close family and shared history",
+    "owned": true,
+    "can_edit": true
+  },
+  {
+    "id": "network-456",
+    "name": "Duckburg",
+    "description": "Discoverable metadata only",
+    "owned": false,
+    "can_edit": false
+  }
+]
+```
+
+### GET /api/v1/networks/{id}
+
+Returns one owned network.
+
+### PUT /api/v1/networks/{id}
+
+Updates owned network metadata.
+
+### POST /api/v1/networks/{id}/archive
+
+Archives an owned network.
+
+### GET /api/v1/networks/{id}/graph
+
+Returns graph data scoped to one owned network.
+
+Response:
+
+```json
+{
+  "network": {
+    "id": "network-123",
+    "owner_id": "acct-123",
+    "name": "Family"
+  },
+  "persons": [
+    {
+      "person": {
+        "id": "person-123",
+        "name": "Kalle Anka",
+        "gender": "m"
+      },
+      "context": {
+        "network_id": "network-123",
+        "person_id": "person-123",
+        "notes": "Network-specific notes"
+      }
+    }
+  ],
+  "organizations": [],
+  "relationships": [],
+  "positions": []
+}
+```
+
+### POST /api/v1/networks/{id}/positions
+
+Stores a graph position scoped to one owned network.
+
+Request:
+
+```json
+{
+  "node_id": "person-123",
+  "node_type": "person",
+  "x": 120,
+  "y": 180
+}
+```
+
+### GET /api/v1/networks/{id}/persons
+
+Lists people in an owned network.
+
+### POST /api/v1/networks/{id}/persons
+
+Adds an existing global person to a network or creates a new global person and adds it to the network.
+
+Request for a new person:
+
+```json
+{
+  "person": {
+    "name": "Kalle Anka",
+    "gender": "m"
+  },
+  "context": {
+    "notes": "Seen in this network",
+    "context": "Family branch"
+  }
+}
+```
+
+Request for an existing person:
+
+```json
+{
+  "person": {
+    "id": "person-123"
+  },
+  "context": {
+    "notes": "Different notes in this network"
+  }
+}
+```
+
+### GET /api/v1/networks/{id}/persons/{personId}
+
+Returns one network person plus network-specific context.
+
+### PUT /api/v1/networks/{id}/persons/{personId}/context
+
+Updates network-specific person context.
+
+### POST /api/v1/networks/{id}/persons/{personId}/archive
+
+Archives the person membership in that network. It does not delete the global person.
+
+---
+
+## Duplicate Suggestions And Merge
+
+### POST /api/v1/person-matches
+
+Returns possible duplicate global persons. Suggestions include confidence and reasons.
+
+Request:
+
+```json
+{
+  "name": "Kalle Anka",
+  "nickname": "Kalle",
+  "organization": "Duckburg",
+  "school": "",
+  "location": "",
+  "relationships": []
+}
+```
+
+Response:
+
+```json
+[
+  {
+    "person": {
+      "id": "person-123",
+      "name": "Kalle Anka",
+      "gender": "m"
+    },
+    "confidence": 0.9,
+    "reasons": ["same name", "same nickname"]
+  }
+]
+```
+
+### POST /api/v1/persons/{id}/merge
+
+Merges a duplicate person into `{id}` when the operation is unambiguous and the current user owns all affected networks.
+
+Request:
+
+```json
+{
+  "removed_person_id": "person-duplicate"
+}
+```
+
+The merge preserves the survivor's existing conflicting fields. Empty survivor fields may be filled from the removed person. Network memberships, attributes, and supported relationship edges are moved to the survivor.
+
+Ambiguous cross-network merges return `403` until a reviewed merge policy is implemented.
 
 ---
 

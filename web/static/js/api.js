@@ -26,6 +26,13 @@ function entityPath(entityType) {
 
 async function apiCreate(entityType, data) {
   const body = Object.assign({}, data);
+  if (entityType === 'person' && window.currentNetworkId) {
+    const result = await apiFetch('/networks/' + window.currentNetworkId + '/persons', {
+      method: 'POST',
+      body: JSON.stringify({ person: body, context: { notes: body.notes || '' } }),
+    });
+    return result.person || result;
+  }
   if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
     body.type = entityType;
   }
@@ -37,10 +44,28 @@ async function apiUpdate(entityType, id, data) {
 }
 
 async function apiDelete(entityType, id) {
+  if (entityType === 'person' && window.currentNetworkId) {
+    await apiFetch('/networks/' + window.currentNetworkId + '/persons/' + id + '/archive', { method: 'POST' });
+    return;
+  }
   await apiFetch('/' + entityPath(entityType) + '/' + id, { method: 'DELETE' });
 }
 
 async function apiLoadAll() {
+  if (window.currentNetworkId) {
+    const networkGraph = await apiFetch('/networks/' + window.currentNetworkId + '/graph');
+    return {
+      persons: (networkGraph.persons || []).map(item => Object.assign({}, item.person, {
+        network_context: item.context,
+      })),
+      organizations: networkGraph.organizations || [],
+      locations: [],
+      tags: [],
+      relationships: networkGraph.relationships || [],
+      positions: networkGraph.positions || [],
+      network: networkGraph.network,
+    };
+  }
   const [graph] = await Promise.all([
     apiFetch('/graph'),
   ]);
@@ -48,7 +73,8 @@ async function apiLoadAll() {
 }
 
 async function apiSavePosition(nodeId, nodeType, x, y) {
-  apiFetch('/positions', {
+  const path = window.currentNetworkId ? '/networks/' + window.currentNetworkId + '/positions' : '/positions';
+  apiFetch(path, {
     method: 'POST',
     body: JSON.stringify({ node_id: nodeId, node_type: nodeType, x, y }),
   }).catch(err => console.warn('Position save failed:', err.message));
@@ -99,4 +125,20 @@ async function apiCurrentAccount() {
 
 async function apiLogout() {
   return apiFetch('/auth/logout', { method: 'POST' });
+}
+
+async function apiListNetworks() {
+  return apiFetch('/networks');
+}
+
+async function apiCreateNetwork(data) {
+  return apiFetch('/networks', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiSearchNetworks(query) {
+  return apiFetch('/networks/search?q=' + encodeURIComponent(query));
+}
+
+async function apiPersonMatches(data) {
+  return apiFetch('/person-matches', { method: 'POST', body: JSON.stringify(data) });
 }
