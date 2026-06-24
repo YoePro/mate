@@ -36,6 +36,17 @@
       <span class="brand-tagline">Memories · Alliances · Time · Engagement</span>
     </div>
     <div class="header-center">
+      <div class="network-switcher">
+        <select id="network-select" class="network-select" title="Network"></select>
+        <div class="network-search-wrap">
+          <input id="network-search-input" class="network-search-input" type="text" placeholder="Search networks" autocomplete="off" />
+        </div>
+        <button id="btn-new-network" class="btn-icon" title="New network">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -55,6 +66,8 @@
           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
         </svg>
       </button>
+      <span id="account-label" class="account-label"></span>
+      <button id="btn-logout" class="btn btn-ghost">Sign out</button>
       <div id="status-indicator" class="status-dot status-ok" title="Connected"></div>
     </div>
   </header>
@@ -203,6 +216,68 @@
       <div class="modal-footer-right">
         <button id="link-modal-cancel" class="btn btn-ghost">Cancel</button>
         <button id="link-modal-save" class="btn btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Person attribute modal -->
+<div id="attribute-modal-overlay" class="modal-hidden">
+  <div id="attribute-modal">
+    <div class="modal-header">
+      <h2>Add Attribute</h2>
+      <button id="attribute-modal-close" class="btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <form id="attribute-form" class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="attribute-type">Type</label>
+        <select id="attribute-type" class="form-select">
+          <option value="title">Title</option>
+          <option value="role">Role</option>
+          <option value="employment">Employment</option>
+          <option value="education">Education</option>
+          <option value="certification">Certification</option>
+          <option value="award">Award</option>
+          <option value="board_membership">Board membership</option>
+          <option value="competition">Competition</option>
+          <option value="achievement">Achievement</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="attribute-value">Value *</label>
+        <input id="attribute-value" class="form-input" type="text" required />
+      </div>
+      <div class="form-group">
+        <label id="attribute-related-label" class="form-label" for="attribute-related">Organization ID</label>
+        <input id="attribute-related" class="form-input" type="text" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="attribute-start">Start</label>
+        <input id="attribute-start" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="attribute-end">End</label>
+        <input id="attribute-end" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input id="attribute-current" type="checkbox" />
+          <span class="form-check-label">Current</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="attribute-notes">Notes</label>
+        <textarea id="attribute-notes" class="form-input" rows="3"></textarea>
+      </div>
+    </form>
+    <div class="modal-footer">
+      <div class="modal-footer-right">
+        <button id="attribute-modal-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="attribute-modal-save" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>

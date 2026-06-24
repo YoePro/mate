@@ -102,7 +102,14 @@ function promptDeleteLink(linkId) {
   const label = REL_LABELS[link.type] || link.type;
   const msg = `Remove relationship "${label}" between ${source ? source.label : '?'} and ${target ? target.label : '?'}?`;
   if (!confirm(msg)) return;
-  apiDeleteRelationship(linkId).then(() => {
+  const deletePromise = isTemporaryGraphMode()
+    ? Promise.resolve()
+    : apiDeleteRelationship(linkId).catch(err => {
+      if (!isTemporaryApiError(err)) throw err;
+      localOnlyWarning('Relationship delete', err);
+    });
+
+  deletePromise.then(() => {
     graph.removeLink(linkId);
   }).catch(err => {
     console.error('Failed to delete relationship:', err);

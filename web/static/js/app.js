@@ -4,14 +4,70 @@
 let modalEntityType = null;
 let modalEntityId = null;
 let modalX = 0, modalY = 0;
+let attributeOwnerType = null;
+let attributeOwnerId = null;
+
+let temporaryIdCounter = 1;
+
+function isTemporaryGraphMode() {
+  return Boolean(window.MATE_CONFIG && window.MATE_CONFIG.temporaryGraph);
+}
+
+function isOrganizationEntityType(entityType) {
+  return entityType === 'company' || entityType === 'association' || entityType === 'school';
+}
+
+function isTemporaryApiError(err) {
+  return err && /^(404|501)\b/.test(err.message || '');
+}
+
+function createTemporaryEntity(entityType, data) {
+  const record = Object.assign({}, data, {
+    id: `tmp-${entityType}-${Date.now()}-${temporaryIdCounter++}`,
+    temporary: true,
+  });
+
+  if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
+    record.type = entityType;
+  }
+
+  return record;
+}
+
+function createTemporaryRelationship(source, target, type, notes) {
+  return {
+    id: `tmp-rel-${Date.now()}-${temporaryIdCounter++}`,
+    source_id: source.id,
+    source_type: source.entityType,
+    target_id: target.id,
+    target_type: target.entityType,
+    type,
+    notes: notes || null,
+    temporary: true,
+  };
+}
+
+function localOnlyWarning(action, err) {
+  console.warn(`${action} is using temporary frontend state:`, err.message);
+}
 
 // ---- Boot ----
 
+let currentAccount = null;
+let currentNetwork = null;
+let ownedNetworks = [];
+window.currentNetworkId = null;
+
 async function boot() {
+  currentAccount = await requireAccount();
+  if (!currentAccount) return;
+
+  await initNetworks();
   initToolbox();
   initInspector();
   initModals();
   initLinkModal();
+  initAttributeModal();
   initSearch();
   initKeyboard();
   initHeaderButtons();
@@ -42,6 +98,13 @@ async function boot() {
 async function loadGraph() {
   setStatus('loading');
   try {
+    if (!window.currentNetworkId) {
+      graph.clear();
+      renderAllNodes();
+      renderAllLinks();
+      setStatus('ok');
+      return;
+    }
     const data = await apiLoadAll();
     graph.load(data);
     renderAllNodes();
@@ -53,15 +116,203 @@ async function loadGraph() {
   }
 }
 
+async function initNetworks() {
+  const select = el('network-select');
+  const createBtn = el('btn-new-network');
+  createBtn.addEventListener('click', handleCreateNetwork);
+  select.addEventListener('change', async () => {
+    const selected = ownedNetworks.find(n => n.id === select.value);
+    setCurrentNetwork(selected || null);
+    await loadGraph();
+  });
+  initNetworkSearch();
+  await refreshNetworks();
+}
+
+async function refreshNetworks() {
+  ownedNetworks = await apiListNetworks();
+  if (!ownedNetworks.length && currentAccount && currentAccount.role !== 'viewer') {
+    const created = await apiCreateNetwork({ name: 'Default network' });
+    ownedNetworks.push(created);
+  }
+  const savedID = window.localStorage.getItem('mate.currentNetworkId');
+  const selected = ownedNetworks.find(n => n.id === savedID) || ownedNetworks[0] || null;
+  renderNetworkOptions(ownedNetworks, selected ? selected.id : '');
+  setCurrentNetwork(selected);
+}
+
+function renderNetworkOptions(networks, selectedID) {
+  const select = el('network-select');
+  clearChildren(select);
+  if (!networks.length) {
+    const option = createEl('option', '');
+    option.value = '';
+    option.textContent = 'No networks';
+    select.appendChild(option);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  networks.forEach(network => {
+    const option = createEl('option', '');
+    option.value = network.id;
+    option.textContent = network.name;
+    option.selected = network.id === selectedID;
+    select.appendChild(option);
+  });
+}
+
+function setCurrentNetwork(network) {
+  currentNetwork = network;
+  window.currentNetworkId = network ? network.id : null;
+  if (window.currentNetworkId) {
+    window.localStorage.setItem('mate.currentNetworkId', window.currentNetworkId);
+  } else {
+    window.localStorage.removeItem('mate.currentNetworkId');
+  }
+}
+
+async function handleCreateNetwork() {
+  const name = prompt('Network name');
+  if (!name || !name.trim()) return;
+  try {
+    const network = await apiCreateNetwork({ name: name.trim() });
+    ownedNetworks = await apiListNetworks();
+    renderNetworkOptions(ownedNetworks, network.id);
+    setCurrentNetwork(network);
+    graph.selectNode(null);
+    await loadGraph();
+  } catch (err) {
+    console.error('Network create failed:', err);
+    alert('Could not create network.');
+  }
+}
+
+function initNetworkSearch() {
+  const input = el('network-search-input');
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const query = input.value.trim();
+    if (query.length < 2) {
+      removeNetworkResults();
+      return;
+    }
+    timer = setTimeout(async () => {
+      try {
+        const results = await apiSearchNetworks(query);
+        showNetworkResults(results);
+      } catch (err) {
+        console.warn('Network search failed:', err.message);
+        removeNetworkResults();
+      }
+    }, 180);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      input.value = '';
+      removeNetworkResults();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const wrap = input.closest('.network-search-wrap');
+    if (wrap && !wrap.contains(e.target)) removeNetworkResults();
+  });
+}
+
+function showNetworkResults(results) {
+  removeNetworkResults();
+  const input = el('network-search-input');
+  const wrap = input.closest('.network-search-wrap');
+  const box = createEl('div', 'network-results');
+  if (!results.length) {
+    const empty = createEl('button', 'network-result-item');
+    empty.type = 'button';
+    empty.disabled = true;
+    empty.textContent = 'No matching networks';
+    box.appendChild(empty);
+  }
+  results.forEach(result => {
+    const item = createEl('button', 'network-result-item');
+    item.type = 'button';
+    item.disabled = !result.owned;
+    const name = createEl('span', 'network-result-name');
+    name.textContent = result.name || 'Untitled network';
+    const meta = createEl('span', 'network-result-meta');
+    meta.textContent = result.owned ? 'Owned by you' : 'Discoverable - no access';
+    item.appendChild(name);
+    item.appendChild(meta);
+    if (result.description) {
+      const desc = createEl('span', 'network-result-meta');
+      desc.textContent = result.description;
+      item.appendChild(desc);
+    }
+    if (result.owned) {
+      item.addEventListener('click', async () => {
+        const selected = ownedNetworks.find(n => n.id === result.id);
+        if (!selected) return;
+        renderNetworkOptions(ownedNetworks, selected.id);
+        setCurrentNetwork(selected);
+        input.value = '';
+        removeNetworkResults();
+        graph.selectNode(null);
+        await loadGraph();
+      });
+    }
+    box.appendChild(item);
+  });
+  wrap.appendChild(box);
+}
+
+function removeNetworkResults() {
+  qsa('.network-results').forEach(node => node.remove());
+}
+
 function setStatus(state) {
   const dot = el('status-indicator');
-  dot.className = 'status-dot';
-  dot.classList.add(`status-${state}`);
+  dot.classList.remove('status-ok', 'status-loading', 'status-error');
+  dot.classList.add('status-dot', `status-${state}`);
+}
+
+
+async function requireAccount() {
+  try {
+    return await apiCurrentAccount();
+  } catch (err) {
+    if (/^401\b/.test(err.message || '')) {
+      window.location.href = '/login';
+      return null;
+    }
+    console.error('Session check failed:', err);
+    window.location.href = '/login';
+    return null;
+  }
+}
+
+function renderCurrentAccount() {
+  const label = el('account-label');
+  if (!label || !currentAccount) return;
+  label.textContent = currentAccount.display_name || currentAccount.email || '';
+  label.title = currentAccount.role ? `${currentAccount.email} (${currentAccount.role})` : currentAccount.email;
+}
+
+async function handleLogout() {
+  el('btn-logout').disabled = true;
+  try {
+    await apiLogout();
+  } catch (err) {
+    console.warn('Logout failed:', err.message);
+  } finally {
+    window.location.href = '/login';
+  }
 }
 
 // ---- Header buttons ----
 
 function initHeaderButtons() {
+  renderCurrentAccount();
+  el('btn-logout').addEventListener('click', handleLogout);
+
   el('btn-fit').addEventListener('click', () => {
     canvas.fitToNodes(graph.nodes);
   });
@@ -116,6 +367,26 @@ function renderInspector(nodeId) {
       title.textContent = node.data.title;
       body.appendChild(title);
     }
+    if (node.data.gender) {
+      const gender = createEl('div', 'inspector-subtitle');
+      gender.textContent = `Gender: ${GENDER_LABELS[node.data.gender] || node.data.gender}`;
+      body.appendChild(gender);
+    }
+    if (node.data.web) {
+      const web = createEl('div', 'inspector-subtitle');
+      web.textContent = node.data.web;
+      body.appendChild(web);
+    }
+    if (node.data.description) {
+      const sec = createEl('div', 'inspector-section');
+      const title = createEl('div', 'inspector-section-title');
+      title.textContent = 'Description';
+      const description = createEl('div', 'inspector-notes');
+      description.textContent = node.data.description;
+      sec.appendChild(title);
+      sec.appendChild(description);
+      body.appendChild(sec);
+    }
     if (node.data.notes) {
       const sec = createEl('div', 'inspector-section');
       const title = createEl('div', 'inspector-section-title');
@@ -126,6 +397,10 @@ function renderInspector(nodeId) {
       sec.appendChild(notes);
       body.appendChild(sec);
     }
+  }
+
+  if (node.entityType === 'person' || isOrganizationEntityType(node.entityType)) {
+    renderAttributes(node.entityType === 'person' ? 'person' : 'organization', node.id, body);
   }
 
   const nodeLinks = graph.getNodeLinks(nodeId);
@@ -161,7 +436,69 @@ function renderInspector(nodeId) {
   editBtn.textContent = 'Edit';
   editBtn.addEventListener('click', () => openEditModal(nodeId));
   actions.appendChild(editBtn);
+
+  if (node.entityType === 'person' || isOrganizationEntityType(node.entityType)) {
+    const attrBtn = createEl('button', 'btn btn-ghost');
+    attrBtn.textContent = 'Add attribute';
+    attrBtn.addEventListener('click', () => openAttributeModal(nodeId));
+    actions.appendChild(attrBtn);
+  }
+
   body.appendChild(actions);
+}
+
+async function renderAttributes(ownerType, ownerId, body) {
+  const sec = createEl('div', 'inspector-section');
+  const title = createEl('div', 'inspector-section-title');
+  title.textContent = 'Attributes';
+  const list = createEl('div', 'inspector-attribute-list');
+  list.textContent = 'Loading...';
+  sec.appendChild(title);
+  sec.appendChild(list);
+  body.appendChild(sec);
+
+  try {
+    const attributes = await apiListAttributes(ownerType, ownerId);
+    clearChildren(list);
+    if (!attributes.length) {
+      list.textContent = 'No attributes yet.';
+      return;
+    }
+    attributes.forEach(attribute => {
+      list.appendChild(buildAttributeItem(attribute));
+    });
+  } catch (err) {
+    list.textContent = 'Could not load attributes.';
+    console.error('Attribute load failed:', err);
+  }
+}
+
+function buildAttributeItem(attribute) {
+  const item = createEl('div', 'inspector-attribute-item');
+  const type = createEl('div', 'inspector-attribute-type');
+  type.textContent = ATTRIBUTE_LABELS[attribute.type] || attribute.type;
+  const value = createEl('div', 'inspector-attribute-value');
+  value.textContent = attribute.value;
+  item.appendChild(type);
+  item.appendChild(value);
+
+  const metaParts = [];
+  if (attribute.start_date) metaParts.push(attribute.start_date);
+  if (attribute.end_date) metaParts.push(attribute.end_date);
+  if (attribute.current) metaParts.push('current');
+  if (metaParts.length) {
+    const meta = createEl('div', 'inspector-attribute-meta');
+    meta.textContent = metaParts.join(' - ');
+    item.appendChild(meta);
+  }
+
+  if (attribute.notes) {
+    const notes = createEl('div', 'inspector-notes');
+    notes.textContent = attribute.notes;
+    item.appendChild(notes);
+  }
+
+  return item;
 }
 
 // ---- Node creation modal ----
@@ -170,15 +507,79 @@ const FORM_FIELDS = {
   person: [
     { key: 'name',     label: 'Full name',       type: 'text',     required: true },
     { key: 'nickname', label: 'Nickname',         type: 'text'  },
+    { key: 'gender',   label: 'Gender',           type: 'select',   options: [
+      { value: '',  label: 'Unspecified' },
+      { value: 'm', label: 'Male' },
+      { value: 'f', label: 'Female' },
+      { value: 'o', label: 'Other' },
+    ] },
     { key: 'title',    label: 'Title / Role',     type: 'text'  },
     { key: 'notes',    label: 'Notes',            type: 'textarea' },
     { key: 'deceased', label: 'Deceased / Legacy', type: 'checkbox' },
   ],
-  company:     [{ key: 'name', label: 'Company name',     type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  association: [{ key: 'name', label: 'Association name', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
-  school:      [{ key: 'name', label: 'School name',      type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  company: [
+    { key: 'name', label: 'Company name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
+  association: [
+    { key: 'name', label: 'Association name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
+  school: [
+    { key: 'name', label: 'School name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
   location:    [{ key: 'name', label: 'Location name',    type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
   tag:         [{ key: 'name', label: 'Tag name',         type: 'text', required: true }],
+};
+
+const GENDER_LABELS = {
+  m: 'Male',
+  f: 'Female',
+  o: 'Other',
+};
+
+const ATTRIBUTE_LABELS = {
+  title: 'Title',
+  role: 'Role',
+  employment: 'Employment',
+  education: 'Education',
+  certification: 'Certification',
+  award: 'Award',
+  board_membership: 'Board membership',
+  board_role: 'Board role',
+  membership: 'Membership',
+  milestone: 'Milestone',
+  competition: 'Competition',
+  achievement: 'Achievement',
+};
+
+const ATTRIBUTE_TYPES = {
+  person: [
+    ['title', 'Title'],
+    ['role', 'Role'],
+    ['employment', 'Employment'],
+    ['education', 'Education'],
+    ['certification', 'Certification'],
+    ['award', 'Award'],
+    ['board_membership', 'Board membership'],
+    ['competition', 'Competition'],
+    ['achievement', 'Achievement'],
+  ],
+  organization: [
+    ['role', 'Role'],
+    ['membership', 'Membership'],
+    ['board_role', 'Board role'],
+    ['certification', 'Certification'],
+    ['award', 'Award'],
+    ['milestone', 'Milestone'],
+  ],
 };
 
 function initModals() {
@@ -230,6 +631,14 @@ function buildModalForm(entityType, data) {
     if (field.type === 'textarea') {
       input = createEl('textarea', 'form-input');
       input.rows = 3;
+    } else if (field.type === 'select') {
+      input = createEl('select', 'form-select');
+      (field.options || []).forEach(option => {
+        const opt = createEl('option', '');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        input.appendChild(opt);
+      });
     } else if (field.type === 'checkbox') {
       const wrap = createEl('label', 'form-check');
       input = createEl('input', '');
@@ -282,11 +691,39 @@ async function handleModalSave() {
 
   try {
     if (modalEntityId) {
-      const result = await apiUpdate(modalEntityType, modalEntityId, data);
+      let result;
+      if (isTemporaryGraphMode()) {
+        result = Object.assign({}, graph.getNode(modalEntityId).data, data);
+      } else {
+        try {
+          result = await apiUpdate(modalEntityType, modalEntityId, data);
+        } catch (err) {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node update', err);
+          result = Object.assign({}, graph.getNode(modalEntityId).data, data);
+        }
+      }
       graph.updateNodeData(modalEntityId, result);
     } else {
-      const result = await apiCreate(modalEntityType, data);
-      await apiSavePosition(result.id, modalEntityType, modalX, modalY);
+      let result;
+      if (isTemporaryGraphMode()) {
+        result = createTemporaryEntity(modalEntityType, data);
+      } else {
+        try {
+          if (modalEntityType === 'person' && window.currentNetworkId) {
+            const existing = await maybeUseExistingPerson(data);
+            if (existing) {
+              data.id = existing.id;
+            }
+          }
+          result = await apiCreate(modalEntityType, data);
+          await apiSavePosition(result.id, modalEntityType, modalX, modalY);
+        } catch (err) {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node creation', err);
+          result = createTemporaryEntity(modalEntityType, data);
+        }
+      }
       graph.addNode({
         id: result.id,
         entityType: modalEntityType,
@@ -306,13 +743,31 @@ async function handleModalSave() {
   }
 }
 
+async function maybeUseExistingPerson(data) {
+  if (!data.name && !data.nickname) return null;
+  const matches = await apiPersonMatches({ name: data.name || '', nickname: data.nickname || '' });
+  if (!matches.length) return null;
+  const top = matches[0];
+  const reasons = (top.reasons || []).join(', ') || 'possible duplicate';
+  const confidence = Math.round((top.confidence || 0) * 100);
+  const message = `Possible match: ${top.person.name} (${confidence}%, ${reasons}).\n\nLink this person to the selected network instead of creating a new global person?`;
+  return confirm(message) ? top.person : null;
+}
+
 async function handleModalDelete() {
   if (!modalEntityId) return;
   const node = graph.getNode(modalEntityId);
   if (!confirm(`Delete "${node ? node.label : '?'}"? This will also remove all relationships.`)) return;
 
   try {
-    await apiDelete(modalEntityType, modalEntityId);
+    if (!isTemporaryGraphMode()) {
+      try {
+        await apiDelete(modalEntityType, modalEntityId);
+      } catch (err) {
+        if (!isTemporaryApiError(err)) throw err;
+        localOnlyWarning('Node delete', err);
+      }
+    }
     removeNodeEl(modalEntityId);
     graph.removeNode(modalEntityId);
     closeModal();
@@ -326,6 +781,91 @@ function closeModal() {
   el('modal-overlay').classList.add('modal-hidden');
   modalEntityType = null;
   modalEntityId = null;
+}
+
+// ---- Attribute modal ----
+
+function initAttributeModal() {
+  el('attribute-modal-close').addEventListener('click', closeAttributeModal);
+  el('attribute-modal-cancel').addEventListener('click', closeAttributeModal);
+  el('attribute-modal-overlay').addEventListener('click', (e) => {
+    if (e.target === el('attribute-modal-overlay')) closeAttributeModal();
+  });
+  el('attribute-modal-save').addEventListener('click', handleAttributeSave);
+}
+
+function openAttributeModal(nodeId) {
+  const node = graph.getNode(nodeId);
+  if (!node) return;
+  attributeOwnerType = node.entityType === 'person' ? 'person' : 'organization';
+  attributeOwnerId = nodeId;
+  el('attribute-form').reset();
+  configureAttributeModal(attributeOwnerType);
+  el('attribute-modal-overlay').classList.remove('modal-hidden');
+  el('attribute-value').focus();
+}
+
+function configureAttributeModal(ownerType) {
+  const select = el('attribute-type');
+  clearChildren(select);
+  (ATTRIBUTE_TYPES[ownerType] || []).forEach(([value, label]) => {
+    const option = createEl('option', '');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+
+  const relatedLabel = el('attribute-related-label');
+  relatedLabel.textContent = ownerType === 'person' ? 'Organization ID' : 'Person ID';
+}
+
+function closeAttributeModal() {
+  el('attribute-modal-overlay').classList.add('modal-hidden');
+  attributeOwnerType = null;
+  attributeOwnerId = null;
+}
+
+async function handleAttributeSave() {
+  if (!attributeOwnerType || !attributeOwnerId) return;
+
+  const value = el('attribute-value').value.trim();
+  if (!value) {
+    el('attribute-value').focus();
+    el('attribute-value').style.borderColor = 'var(--error)';
+    setTimeout(() => { el('attribute-value').style.borderColor = ''; }, 1200);
+    return;
+  }
+
+  const data = {
+    type: el('attribute-type').value,
+    value,
+    start_date: el('attribute-start').value.trim(),
+    end_date: el('attribute-end').value.trim(),
+    current: el('attribute-current').checked,
+    notes: el('attribute-notes').value.trim(),
+  };
+  const relatedId = el('attribute-related').value.trim();
+  if (attributeOwnerType === 'person') {
+    data.organization_id = relatedId;
+  } else {
+    data.person_id = relatedId;
+  }
+
+  el('attribute-modal-save').disabled = true;
+  el('attribute-modal-save').textContent = 'Saving...';
+
+  try {
+    await apiCreateAttribute(attributeOwnerType, attributeOwnerId, data);
+    const nodeId = attributeOwnerId;
+    closeAttributeModal();
+    renderInspector(nodeId);
+  } catch (err) {
+    console.error('Attribute save failed:', err);
+    alert('Could not save attribute.');
+  } finally {
+    el('attribute-modal-save').disabled = false;
+    el('attribute-modal-save').textContent = 'Save';
+  }
 }
 
 // ---- Link modal ----
@@ -385,11 +925,22 @@ async function handleLinkSave() {
 
   el('link-modal-save').disabled = true;
   try {
-    const rel = await apiCreateRelationship(
-      source.id, source.entityType,
-      target.id, target.entityType,
-      type, notes
-    );
+    let rel;
+    if (isTemporaryGraphMode()) {
+      rel = createTemporaryRelationship(source, target, type, notes);
+    } else {
+      try {
+        rel = await apiCreateRelationship(
+          source.id, source.entityType,
+          target.id, target.entityType,
+          type, notes
+        );
+      } catch (err) {
+        if (!isTemporaryApiError(err)) throw err;
+        localOnlyWarning('Relationship creation', err);
+        rel = createTemporaryRelationship(source, target, type, notes);
+      }
+    }
     graph.addLink({
       id: rel.id,
       sourceId: source.id,
@@ -501,7 +1052,14 @@ function initKeyboard() {
       const nodeId = graph.selectedNodeId;
       const node = graph.getNode(nodeId);
       if (!confirm(`Delete "${node ? node.label : '?'}"?`)) return;
-      apiDelete(node.entityType, nodeId).then(() => {
+      const deletePromise = isTemporaryGraphMode()
+        ? Promise.resolve()
+        : apiDelete(node.entityType, nodeId).catch(err => {
+          if (!isTemporaryApiError(err)) throw err;
+          localOnlyWarning('Node delete', err);
+        });
+
+      deletePromise.then(() => {
         removeNodeEl(nodeId);
         graph.removeNode(nodeId);
       }).catch(err => {

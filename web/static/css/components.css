@@ -226,6 +226,42 @@
   font-style: italic;
 }
 
+.inspector-attribute-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.inspector-attribute-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+
+.inspector-attribute-type {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.inspector-attribute-value {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.inspector-attribute-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .inspector-actions {
   display: flex;
   gap: 8px;
@@ -245,7 +281,8 @@
 }
 
 #modal-overlay,
-#link-modal-overlay {
+#link-modal-overlay,
+#attribute-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.65);
@@ -257,7 +294,8 @@
 }
 
 #modal,
-#link-modal {
+#link-modal,
+#attribute-modal {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

@@ -12,6 +12,7 @@ type Config struct {
 	Neo4jURI      string
 	Neo4jUser     string
 	Neo4jPassword string
+	Neo4jDatabase string
 }
 
 // Load returns the application configuration.
@@ -30,11 +31,12 @@ func Load() Config {
 
 func defaultConfig() Config {
 	return Config{
-		ServerAddress: ":8325",
+		ServerAddress: "0.0.0.0:8325",
 
 		Neo4jURI:      "neo4j://localhost:7687",
 		Neo4jUser:     "neo4j",
 		Neo4jPassword: "",
+		Neo4jDatabase: "",
 	}
 }
 
@@ -60,6 +62,10 @@ func loadINI(path string, cfg *Config) bool {
 
 	if v, ok := sectionValue(sections, "neo4j", "password"); ok {
 		cfg.Neo4jPassword = v
+	}
+
+	if v, ok := sectionValue(sections, "neo4j", "database"); ok {
+		cfg.Neo4jDatabase = v
 	}
 
 	return true

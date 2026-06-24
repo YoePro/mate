@@ -4,22 +4,24 @@ package models
 type RelationshipType string
 
 const (
-	RelationshipKnows       RelationshipType = "knows"
-	RelationshipSpouseOf    RelationshipType = "spouse_of"
-	RelationshipParentOf    RelationshipType = "parent_of"
-	RelationshipWorksAt     RelationshipType = "works_at"
-	RelationshipMemberOf    RelationshipType = "member_of"
-	RelationshipStudiedAt   RelationshipType = "studied_at"
+	RelationshipKnows     RelationshipType = "knows"
+	RelationshipSpouseOf  RelationshipType = "spouse_of"
+	RelationshipParentOf  RelationshipType = "parent_of"
+	RelationshipSiblingOf RelationshipType = "sibling_of"
+	RelationshipWorksAt   RelationshipType = "works_at"
+	RelationshipMemberOf  RelationshipType = "member_of"
+	RelationshipStudiedAt RelationshipType = "studied_at"
+	RelationshipLivesIn   RelationshipType = "lives_in"
+	RelationshipHasTag    RelationshipType = "has_tag"
 )
 
 // Relationship represents a connection between two nodes.
 type Relationship struct {
-	ID     string           `json:"id"`
-	FromID string           `json:"fromId"`
-	ToID   string           `json:"toId"`
-	Type   RelationshipType `json:"type"`
-	Role   string           `json:"role,omitempty"`
-	From   string           `json:"from,omitempty"`
-	To     string           `json:"to,omitempty"`
-	Notes  string           `json:"notes,omitempty"`
+	ID         string           `json:"id"`
+	SourceID   string           `json:"source_id"`
+	SourceType string           `json:"source_type"`
+	TargetID   string           `json:"target_id"`
+	TargetType string           `json:"target_type"`
+	Type       RelationshipType `json:"type"`
+	Notes      string           `json:"notes,omitempty"`
 }
