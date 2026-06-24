@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MATE — User Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0f1117;
+      --bg-panel:   #161b27;
+      --bg-surface: #1a2030;
+      --bg-raised:  #1e2535;
+      --bg-input:   #1a2030;
+      --border:     #2a3347;
+      --border-sub: #1e2a3a;
+      --text-1:     #f1f5f9;
+      --text-2:     #94a3b8;
+      --text-3:     #4b5563;
+      --accent:     #3b82f6;
+      --accent-h:   #2563eb;
+      --success:    #10b981;
+      --warning:    #f59e0b;
+      --error:      #ef4444;
+      --radius:     8px;
+      --radius-sm:  5px;
+      --sidebar-w:  300px;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      height: 52px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-icon { width: 22px; height: 22px; color: var(--accent); }
+    .topbar-name { font-size: 15px; font-weight: 700; letter-spacing: 0.1em; color: var(--text-1); }
+    .topbar-sep { color: var(--text-3); font-size: 18px; font-weight: 300; }
+    .topbar-title { font-size: 13px; font-weight: 500; color: var(--text-2); }
+    .topbar-spacer { flex: 1; }
+    .topbar-user { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-3); }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .sidebar-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--border-sub); flex-shrink: 0; }
+    .sidebar-head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .sidebar-heading { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+    .user-count { font-size: 11px; color: var(--text-3); }
+
+    .search-box { position: relative; }
+    .search-box svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-3); pointer-events: none; }
+    .search-box input { width: 100%; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 10px 7px 30px; font-size: 13px; color: var(--text-1); outline: none; font-family: inherit; transition: border-color 0.15s; }
+    .search-box input::placeholder { color: var(--text-3); }
+    .search-box input:focus { border-color: var(--accent); }
+
+    .user-list { flex: 1; overflow-y: auto; padding: 6px 8px; }
+    .user-list::-webkit-scrollbar { width: 4px; }
+    .user-list::-webkit-scrollbar-track { background: transparent; }
+    .user-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .user-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; transition: background 0.12s; border: 1px solid transparent; }
+    .user-item:hover { background: var(--bg-surface); }
+    .user-item.active { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.25); }
+
+    .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-raised); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--text-2); }
+    .user-item.active .user-avatar { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .user-meta { flex: 1; min-width: 0; }
+    .user-item-name { font-size: 13px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-item-email { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-badges { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+
+    .badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 100px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+    .badge-admin  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .badge-editor { background: rgba(16,185,129,0.12); color: #34d399; }
+    .badge-ro     { background: rgba(245,158,11,0.12);  color: #fbbf24; }
+
+    .user-list-empty { padding: 24px 12px; text-align: center; font-size: 12px; color: var(--text-3); }
+
+    .detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+    .detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-3); }
+    .detail-empty svg { width: 48px; height: 48px; opacity: 0.3; }
+    .detail-empty p { font-size: 13px; }
+
+    .detail-inner { display: none; flex-direction: column; height: 100%; }
+    .detail-inner.visible { display: flex; }
+
+    .detail-topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .detail-user-hero { display: flex; align-items: center; gap: 14px; }
+    .detail-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--bg-raised); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: var(--text-2); flex-shrink: 0; }
+    .detail-user-name { font-size: 17px; font-weight: 700; color: var(--text-1); line-height: 1.2; }
+    .detail-user-email { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .detail-topbar-actions { display: flex; gap: 8px; }
+
+    .detail-body { flex: 1; overflow-y: auto; padding: 28px 32px 40px; }
+    .detail-body::-webkit-scrollbar { width: 4px; }
+    .detail-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .form-section { margin-bottom: 32px; }
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border-sub); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-label { font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: 0.04em; }
+    .form-hint { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+    .form-input { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; color: var(--text-1); outline: none; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+    .form-input::placeholder { color: var(--text-3); }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+
+    .role-group { display: flex; gap: 8px; }
+    .role-btn { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); color: var(--text-2); font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+    .role-btn:hover { border-color: #374151; color: var(--text-1); }
+    .role-btn.active-editor { border-color: #10b981; background: rgba(16,185,129,0.1); color: #34d399; }
+    .role-btn.active-admin  { border-color: var(--accent); background: rgba(59,130,246,0.1); color: #60a5fa; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .toggle-info { display: flex; flex-direction: column; gap: 2px; }
+    .toggle-title { font-size: 13px; font-weight: 500; color: var(--text-1); }
+    .toggle-desc { font-size: 11px; color: var(--text-3); }
+    .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track { position: absolute; inset: 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 100px; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+    .toggle-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: var(--text-3); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .toggle input:checked + .toggle-track { background: rgba(245,158,11,0.2); border-color: #f59e0b; }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); background: #f59e0b; }
+
+    .danger-zone { background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .danger-info { flex: 1; }
+    .danger-title { font-size: 13px; font-weight: 600; color: var(--error); margin-bottom: 3px; }
+    .danger-desc { font-size: 11px; color: var(--text-3); }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; border: 1px solid transparent; white-space: nowrap; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:not(:disabled):hover { background: var(--accent-h); border-color: var(--accent-h); }
+    .btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+    .btn-ghost:not(:disabled):hover { color: var(--text-1); border-color: #374151; }
+    .btn-danger { background: transparent; color: var(--error); border-color: rgba(239,68,68,0.4); }
+    .btn-danger:not(:disabled):hover { background: rgba(239,68,68,0.1); border-color: var(--error); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    #toast { position: fixed; bottom: 24px; right: 24px; padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 9999; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok  { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+    #toast.err { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+
+    #auth-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .auth-box { width: 360px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px 28px; box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
+    .auth-box h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .auth-box p { font-size: 12px; color: var(--text-3); margin-bottom: 20px; }
+    .auth-message { font-size: 12px; min-height: 16px; margin-bottom: 12px; }
+    .auth-message.error   { color: var(--error); }
+    .auth-message.success { color: var(--success); }
+  </style>
+</head>
+<body>
+
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>Admin Sign in</h2>
+    <p>Sign in with your admin account to access user management.</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Email</label>
+      <input id="auth-email" type="email" class="form-input" placeholder="admin@example.com" autocomplete="email" />
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Password</label>
+      <input id="auth-password" type="password" class="form-input" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="auth-message" id="auth-message"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" id="auth-submit">Sign in</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;height:100%;flex-direction:column">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <svg class="topbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/>
+        <circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/>
+        <line x1="6" y1="7" x2="10" y2="11"/><line x1="18" y1="7" x2="14" y2="11"/>
+        <line x1="6" y1="17" x2="10" y2="13"/><line x1="18" y1="17" x2="14" y2="13"/>
+      </svg>
+      <span class="topbar-name">MATE</span>
+    </div>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-title">User Management</span>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-user">
+      <span id="topbar-email"></span>
+      <button class="btn btn-ghost btn-sm" id="btn-signout">Sign out</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="sidebar-head-row">
+          <span class="sidebar-heading">Users</span>
+          <span class="user-count" id="user-count"></span>
+        </div>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input id="search-input" type="text" placeholder="Search users..." autocomplete="off" />
+        </div>
+      </div>
+      <div class="user-list" id="user-list"></div>
+    </aside>
+
+    <main class="detail">
+      <div class="detail-empty" id="detail-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        <p>Select a user to view and edit their profile</p>
+      </div>
+
+      <div class="detail-inner" id="detail-inner">
+        <div class="detail-topbar">
+          <div class="detail-user-hero">
+            <div class="detail-avatar" id="detail-avatar">?</div>
+            <div>
+              <div class="detail-user-name" id="detail-name-display">—</div>
+              <div class="detail-user-email" id="detail-email-display">—</div>
+            </div>
+          </div>
+          <div class="detail-topbar-actions">
+            <button class="btn btn-primary" id="btn-save">Save changes</button>
+          </div>
+        </div>
+
+        <div class="detail-body">
+          <div class="form-section">
+            <div class="section-label">Identity</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input id="field-name" type="text" class="form-input" placeholder="Full name" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email address</label>
+                <input id="field-email" type="email" class="form-input" placeholder="user@example.com" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-label">Change Password</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">New password</label>
+                <input id="field-password" type="password" class="form-input" placeholder="Leave blank to keep current" autocomplete="new-password" />
+                <span class="form-hint">Minimum 6 characters. Leave blank to keep unchanged.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-label">Role &amp; Access</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Role</label>
+                <div class="role-group">
+                  <button type="button" class="role-btn" id="role-editor" onclick="selectRole('editor')">Editor</button>
+                  <button type="button" class="role-btn" id="role-admin"  onclick="selectRole('admin')">Admin</button>
+                </div>
+                <span class="form-hint">Admins can manage users and access all data.</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Read-only mode</label>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-title">Read-only</div>
+                    <div class="toggle-desc">User can view but not create or edit</div>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="field-readonly" />
+                    <span class="toggle-track"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-label">Account Info</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Account created</label>
+                <input id="info-created" type="text" class="form-input" readonly style="opacity:0.5;cursor:default" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Last sign in</label>
+                <input id="info-last-signin" type="text" class="form-input" readonly style="opacity:0.5;cursor:default" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-label">Danger Zone</div>
+            <div class="danger-zone">
+              <div class="danger-info">
+                <div class="danger-title">Delete user account</div>
+                <div class="danger-desc">Permanently deletes this user and all their data. This cannot be undone.</div>
+              </div>
+              <button class="btn btn-danger" id="btn-delete">Delete user</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+window.MATE_CONFIG = {
+  supabaseUrl: '%VITE_SUPABASE_URL%',
+  supabaseKey: '%VITE_SUPABASE_ANON_KEY%',
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+'use strict';
+const { createClient } = supabase;
+const db = createClient(window.MATE_CONFIG.supabaseUrl, window.MATE_CONFIG.supabaseKey);
+const EDGE_URL = `${window.MATE_CONFIG.supabaseUrl}/functions/v1/admin-users`;
+
+let users = [], filteredUsers = [], selectedId = null, currentRole = 'editor', authToken = null;
+
+db.auth.onAuthStateChange((event, session) => {
+  if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+    authToken = session.access_token;
+    document.getElementById('auth-overlay').style.display = 'none';
+    const app = document.getElementById('app');
+    app.style.display = 'flex';
+    document.getElementById('topbar-email').textContent = session.user.email ?? '';
+    loadUsers();
+  } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
+    authToken = null;
+    document.getElementById('auth-overlay').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+  if (event === 'TOKEN_REFRESHED' && session) authToken = session.access_token;
+});
+
+document.getElementById('auth-submit').addEventListener('click', doSignIn);
+['auth-email','auth-password'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+});
+
+async function doSignIn() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const btn = document.getElementById('auth-submit');
+  if (!email || !password) { setAuthMsg('Please enter email and password.', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in…'; setAuthMsg('');
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { setAuthMsg(error.message, 'error'); btn.disabled = false; btn.textContent = 'Sign in'; }
+}
+
+function setAuthMsg(text, type) {
+  const el = document.getElementById('auth-message');
+  el.textContent = text;
+  el.className = 'auth-message' + (type ? ' ' + type : '');
+}
+
+document.getElementById('btn-signout').addEventListener('click', () => db.auth.signOut());
+
+async function loadUsers() {
+  try {
+    const res = await fetch(EDGE_URL, { headers: { Authorization: `Bearer ${authToken}` } });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 403) { showToast('Admin role required to access this page.', 'err'); return; }
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    users = await res.json();
+    applyFilter();
+  } catch (err) { showToast('Failed to load users: ' + err.message, 'err'); }
+}
+
+document.getElementById('search-input').addEventListener('input', applyFilter);
+
+function applyFilter() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  filteredUsers = q ? users.filter(u => (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)) : [...users];
+  renderList();
+}
+
+function renderList() {
+  const list = document.getElementById('user-list');
+  document.getElementById('user-count').textContent = `${filteredUsers.length} / ${users.length}`;
+  if (!filteredUsers.length) { list.innerHTML = '<div class="user-list-empty">No users found</div>'; return; }
+  list.innerHTML = '';
+  filteredUsers.forEach(u => {
+    const ini = initials2(u.name || u.email || '?');
+    const item = document.createElement('div');
+    item.className = 'user-item' + (u.id === selectedId ? ' active' : '');
+    item.dataset.id = u.id;
+    item.innerHTML = `<div class="user-avatar">${ini}</div><div class="user-meta"><div class="user-item-name">${esc(u.name||u.email||u.id)}</div><div class="user-item-email">${esc(u.email||'')}</div></div><div class="user-badges"><span class="badge badge-${u.role}">${u.role}</span>${u.read_only ? '<span class="badge badge-ro">R/O</span>' : ''}</div>`;
+    item.addEventListener('click', () => selectUser(u.id));
+    list.appendChild(item);
+  });
+}
+
+function selectUser(id) {
+  selectedId = id;
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  document.querySelectorAll('.user-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  document.getElementById('detail-empty').style.display = 'none';
+  document.getElementById('detail-inner').classList.add('visible');
+  const ini = initials2(u.name || u.email || '?');
+  document.getElementById('detail-avatar').textContent = ini;
+  document.getElementById('detail-name-display').textContent = u.name || u.email || u.id;
+  document.getElementById('detail-email-display').textContent = u.email || '';
+  document.getElementById('field-name').value = u.name || '';
+  document.getElementById('field-email').value = u.email || '';
+  document.getElementById('field-password').value = '';
+  document.getElementById('field-readonly').checked = !!u.read_only;
+  document.getElementById('info-created').value = u.created_at ? fmtDate(u.created_at) : '—';
+  document.getElementById('info-last-signin').value = u.last_sign_in_at ? fmtDate(u.last_sign_in_at) : 'Never';
+  selectRole(u.role || 'editor');
+}
+
+function selectRole(role) {
+  currentRole = role;
+  document.getElementById('role-editor').className = 'role-btn' + (role === 'editor' ? ' active-editor' : '');
+  document.getElementById('role-admin').className  = 'role-btn' + (role === 'admin'  ? ' active-admin'  : '');
+}
+
+document.getElementById('btn-save').addEventListener('click', saveUser);
+
+async function saveUser() {
+  if (!selectedId) return;
+  const btn = document.getElementById('btn-save');
+  const payload = {
+    name:      document.getElementById('field-name').value.trim() || null,
+    email:     document.getElementById('field-email').value.trim() || null,
+    role:      currentRole,
+    read_only: document.getElementById('field-readonly').checked,
+  };
+  const pw = document.getElementById('field-password').value;
+  if (pw) { if (pw.length < 6) { showToast('Password must be at least 6 characters.', 'err'); return; } payload.password = pw; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${EDGE_URL}/${selectedId}`, { method: 'PATCH', headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    const idx = users.findIndex(u => u.id === selectedId);
+    if (idx !== -1) { users[idx] = { ...users[idx], ...payload }; if (payload.email) users[idx].email = payload.email; }
+    applyFilter(); selectUser(selectedId);
+    showToast('Changes saved.', 'ok');
+    document.getElementById('field-password').value = '';
+  } catch (err) { showToast('Save failed: ' + err.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Save changes'; }
+}
+
+document.getElementById('btn-delete').addEventListener('click', deleteUser);
+
+async function deleteUser() {
+  if (!selectedId) return;
+  const u = users.find(x => x.id === selectedId);
+  if (!confirm(`Delete "${u?.name || u?.email || selectedId}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`${EDGE_URL}/${selectedId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${authToken}` } });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    users = users.filter(u => u.id !== selectedId); selectedId = null;
+    document.getElementById('detail-inner').classList.remove('visible');
+    document.getElementById('detail-empty').style.display = 'flex';
+    applyFilter(); showToast('User deleted.', 'ok');
+  } catch (err) { showToast('Delete failed: ' + err.message, 'err'); }
+}
+
+function initials2(str) {
+  const parts = str.trim().split(/[\s@.]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return str.slice(0, 2).toUpperCase();
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(iso) { return new Date(iso).toLocaleString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }); }
+
+let toastTimer = null;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+</script>
+</body>
+</html>
