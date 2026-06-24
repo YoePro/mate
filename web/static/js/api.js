@@ -92,3 +92,11 @@ async function apiCreateAttribute(ownerType, ownerId, data) {
     body: JSON.stringify(data),
   });
 }
+
+async function apiCurrentAccount() {
+  return apiFetch('/auth/me');
+}
+
+async function apiLogout() {
+  return apiFetch('/auth/logout', { method: 'POST' });
+}

@@ -56,6 +56,9 @@ func (s *PersonService) Delete(ctx context.Context, id string) error {
 
 // ListAttributes returns profile attributes for a person.
 func (s *PersonService) ListAttributes(ctx context.Context, personID string) ([]models.PersonAttribute, error) {
+	if _, err := s.store.GetPerson(ctx, personID); err != nil {
+		return nil, err
+	}
 	return s.store.ListPersonAttributes(ctx, personID)
 }
 

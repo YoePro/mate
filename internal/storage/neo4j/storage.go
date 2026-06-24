@@ -477,7 +477,7 @@ func (s *Storage) ListPersonAttributes(ctx context.Context, personID string) ([]
 		if err != nil {
 			return nil, err
 		}
-		var attributes []models.PersonAttribute
+		attributes := make([]models.PersonAttribute, 0)
 		for result.Next(ctx) {
 			attributes = append(attributes, personAttributeFromRecord(result.Record()))
 		}
@@ -723,7 +723,7 @@ func (s *Storage) ListOrganizationAttributes(ctx context.Context, organizationID
 		if err != nil {
 			return nil, err
 		}
-		var attributes []models.OrganizationAttribute
+		attributes := make([]models.OrganizationAttribute, 0)
 		for result.Next(ctx) {
 			attributes = append(attributes, organizationAttributeFromRecord(result.Record()))
 		}

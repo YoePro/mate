@@ -12,14 +12,24 @@ MATE 0.7 uses Neo4j as the primary runtime storage.
 
 MATE creates constraints for:
 
+- `Account.id`
+- `Account.email`
+- `Session.id`
+- `Session.token_hash`
 - `Person.id`
+- `PersonAttribute.id`
 - `Organization.id`
+- `OrganizationAttribute.id`
 - `Position.node_id` and `Position.node_type`
 
 Current graph labels:
 
+- `Account`
+- `Session`
 - `Person`
+- `PersonAttribute`
 - `Organization`
+- `OrganizationAttribute`
 - `Position`
 
 Relationship types are created from the supported MATE relationship types, such as `knows`, `works_at`, and `member_of`.
@@ -27,3 +37,7 @@ Relationship types are created from the supported MATE relationship types, such 
 ## Unavailable database behavior
 
 MATE verifies Neo4j connectivity during startup. If Neo4j is unavailable or credentials are wrong, startup fails with the Neo4j driver error.
+
+## Authentication data
+
+Accounts are stored as `Account` nodes. Passwords are stored as bcrypt hashes only. Login sessions are stored as `Session` nodes related to accounts and are looked up by a SHA-256 hash of the browser cookie token.

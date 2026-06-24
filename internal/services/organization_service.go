@@ -65,6 +65,9 @@ func (s *OrganizationService) Delete(ctx context.Context, id string) error {
 
 // ListAttributes returns profile attributes for an organization.
 func (s *OrganizationService) ListAttributes(ctx context.Context, organizationID string) ([]models.OrganizationAttribute, error) {
+	if _, err := s.store.GetOrganization(ctx, organizationID); err != nil {
+		return nil, err
+	}
 	return s.store.ListOrganizationAttributes(ctx, organizationID)
 }
 

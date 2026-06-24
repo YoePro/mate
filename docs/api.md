@@ -26,7 +26,11 @@ Errors use this JSON shape:
 
 ### GET /
 
-Returns the MATE HTML application shell.
+Returns the MATE HTML application shell. The frontend checks `GET /api/v1/auth/me` during boot and redirects unauthenticated users to `/login`.
+
+### GET /login
+
+Returns the login and first-owner bootstrap page. If no owner exists, the page exposes the owner creation flow. Once an owner exists, the page signs in with `POST /api/v1/auth/login`.
 
 ### GET /static/
 
@@ -108,7 +112,7 @@ Response:
 
 ### POST /api/v1/auth/logout
 
-Deletes the current session and expires the session cookie.
+Deletes the current session and expires the session cookie. The frontend header uses this endpoint for `Sign out`.
 
 ### GET /api/v1/auth/me
 
@@ -118,7 +122,7 @@ Returns the authenticated account tied to the current session cookie.
 
 ## Accounts
 
-Account management requires an authenticated owner session.
+Account management requires an authenticated owner session. In 0.7 these endpoints are API-only; the browser UI has login/logout but not a full account management screen yet.
 
 Supported roles are `owner`, `admin`, `editor`, and `viewer`.
 

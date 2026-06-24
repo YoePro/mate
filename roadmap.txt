@@ -513,6 +513,16 @@ Add real backend API structure and Neo4j-backed storage.
 Scope:
 Backend becomes useful with real graph persistence. Neo4j is introduced in this version so API, storage, and frontend integration can be developed against the target graph database from the start. A small in-memory storage may still exist for tests, but Neo4j is the primary runtime storage.
 
+Current implementation status:
+
+* Neo4j-backed runtime storage is implemented for accounts, sessions, persons, organizations, relationships, graph positions, and profile attributes.
+* `/login` serves the login and first-owner bootstrap page.
+* `/` requires a valid session and redirects unauthenticated users to `/login`.
+* The app header shows the current account and supports logout.
+* Owner account management exists through API endpoints; a full account-management UI remains a later beta-hardening task.
+* Person and organization attributes can be added in the graph inspector. Update and archive endpoints are API-only in 0.7.
+* Attribute lists return `[]` when empty and `404` for unknown profile owners.
+
 Implementation checklist:
 
 * Define API endpoint behavior in docs/api.md.
@@ -722,6 +732,8 @@ Acceptance criteria:
 * Relationships can be created through API and stored as graph edges.
 * Graph endpoint returns nodes and links from Neo4j.
 * Frontend can fetch graph data from backend.
+* Frontend redirects unauthenticated users to `/login`.
+* Frontend login and logout flows work with persisted sessions.
 * First owner account can be bootstrapped and stored in Neo4j.
 * Login, logout, and current-user endpoints work with persisted accounts.
 * Owner can create at least one additional account with a role.
@@ -740,6 +752,9 @@ Test checklist:
 * Test POST /api/v1/auth/login.
 * Test POST /api/v1/auth/logout.
 * Test GET /api/v1/auth/me.
+* Test `/login` in browser with an existing account.
+* Test `/` redirects to `/login` when unauthenticated.
+* Test header logout redirects back to `/login`.
 * Test account creation and role assignment.
 * Test POST /api/v1/persons.
 * Test GET /api/v1/persons.
@@ -765,6 +780,7 @@ Documentation checklist:
 * docs/api.md documents error format.
 * docs/api.md documents relationship types.
 * docs/api.md documents account roles and auth endpoints.
+* docs/accounts.md documents login, owner bootstrap, sessions, roles, and current UI limitations.
 * docs/api.md documents person and organization profile endpoints.
 * docs/api.md documents attribute types and time-bound fields.
 * roadmap.txt updated with any new entities.
@@ -882,7 +898,10 @@ Implementation checklist:
 * Decide whether Company, Association, and School are separate labels or organization subtypes.
 * Add login page.
 * Add owner bootstrap flow UI.
-* Add account management view for owner.
+* Add create-account page for owner.
+* Add user admin page for owner.
+* Add account management view for owner, including list accounts, create account, change role, and disable account.
+* Add navigation from the app header to user admin for owner accounts.
 * Add basic edit forms.
 * Add update person.
 * Add update person profile fields.
@@ -904,7 +923,10 @@ Acceptance criteria:
 * Account, role, profile, attribute, and graph data survive server restart.
 * Existing API endpoints are stable enough for beta use.
 * Login works with persisted accounts.
-* Owner can create and manage other accounts.
+* Owner can create and manage other accounts from the browser UI.
+* Owner can open a user admin page and see existing accounts.
+* Owner can open a create-account page and create admin, editor, or viewer accounts.
+* Non-owner roles cannot open or use user admin actions.
 * Frontend graph loads real data from Neo4j.
 * Person profile page loads real data.
 * Organization profile page loads real data.
@@ -918,7 +940,11 @@ Test checklist:
 * Start MATE.
 * Bootstrap owner account.
 * Log in as owner.
-* Create another account with a non-owner role.
+* Create another account with a non-owner role through the create-account page.
+* Open the user admin page as owner and confirm the account list.
+* Change a user role from the user admin page.
+* Disable a user from the user admin page.
+* Log in as a non-owner and confirm user admin is blocked.
 * Create person through API and UI.
 * Add person profile attributes.
 * Create organization through API and UI.

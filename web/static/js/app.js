@@ -53,7 +53,12 @@ function localOnlyWarning(action, err) {
 
 // ---- Boot ----
 
+let currentAccount = null;
+
 async function boot() {
+  currentAccount = await requireAccount();
+  if (!currentAccount) return;
+
   initToolbox();
   initInspector();
   initModals();
@@ -106,9 +111,45 @@ function setStatus(state) {
   dot.classList.add('status-dot', `status-${state}`);
 }
 
+
+async function requireAccount() {
+  try {
+    return await apiCurrentAccount();
+  } catch (err) {
+    if (/^401\b/.test(err.message || '')) {
+      window.location.href = '/login';
+      return null;
+    }
+    console.error('Session check failed:', err);
+    window.location.href = '/login';
+    return null;
+  }
+}
+
+function renderCurrentAccount() {
+  const label = el('account-label');
+  if (!label || !currentAccount) return;
+  label.textContent = currentAccount.display_name || currentAccount.email || '';
+  label.title = currentAccount.role ? `${currentAccount.email} (${currentAccount.role})` : currentAccount.email;
+}
+
+async function handleLogout() {
+  el('btn-logout').disabled = true;
+  try {
+    await apiLogout();
+  } catch (err) {
+    console.warn('Logout failed:', err.message);
+  } finally {
+    window.location.href = '/login';
+  }
+}
+
 // ---- Header buttons ----
 
 function initHeaderButtons() {
+  renderCurrentAccount();
+  el('btn-logout').addEventListener('click', handleLogout);
+
   el('btn-fit').addEventListener('click', () => {
     canvas.fitToNodes(graph.nodes);
   });
