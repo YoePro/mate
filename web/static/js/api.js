@@ -2,6 +2,18 @@
 // window.MATE_CONFIG is loaded from /static/js/config.js served by the backend.
 
 const BASE = (window.MATE_CONFIG && window.MATE_CONFIG.apiBasePath) || '/api/v1';
+const API_ORGANIZATION_TYPES = [
+  'company',
+  'association',
+  'school',
+  'government',
+  'political_party',
+  'religious_organization',
+  'sports_club',
+  'military_unit',
+  'ngo',
+  'community',
+];
 
 async function apiFetch(path, options) {
   const res = await fetch(BASE + path, Object.assign({
@@ -18,7 +30,8 @@ async function apiFetch(path, options) {
 // Map entity type to API resource path
 function entityPath(entityType) {
   if (entityType === 'person')                          return 'persons';
-  if (entityType === 'company' || entityType === 'association' || entityType === 'school') return 'organizations';
+  if (API_ORGANIZATION_TYPES.includes(entityType)) return 'organizations';
+  if (entityType === 'project')                       return 'projects';
   if (entityType === 'location')                        return 'locations';
   if (entityType === 'tag')                             return 'tags';
   return entityType + 's';
@@ -33,7 +46,7 @@ async function apiCreate(entityType, data) {
     });
     return result.person || result;
   }
-  if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
+  if (API_ORGANIZATION_TYPES.includes(entityType)) {
     body.type = entityType;
   }
   return apiFetch('/' + entityPath(entityType), { method: 'POST', body: JSON.stringify(body) });
@@ -59,10 +72,12 @@ async function apiLoadAll() {
         network_context: item.context,
       })),
       organizations: networkGraph.organizations || [],
+      projects: networkGraph.projects || [],
       locations: [],
       tags: [],
       relationships: networkGraph.relationships || [],
       positions: networkGraph.positions || [],
+      custom_relationship_types: networkGraph.custom_relationship_types || [],
       network: networkGraph.network,
     };
   }
@@ -80,10 +95,17 @@ async function apiSavePosition(nodeId, nodeType, x, y) {
   }).catch(err => console.warn('Position save failed:', err.message));
 }
 
-async function apiCreateRelationship(sourceId, sourceType, targetId, targetType, type, notes) {
+async function apiCreateRelationship(sourceId, sourceType, targetId, targetType, type, data) {
+  const relationship = Object.assign({
+    source_id: sourceId,
+    source_type: sourceType,
+    target_id: targetId,
+    target_type: targetType,
+    type,
+  }, data || {});
   return apiFetch('/relationships', {
     method: 'POST',
-    body: JSON.stringify({ source_id: sourceId, source_type: sourceType, target_id: targetId, target_type: targetType, type, notes: notes || null }),
+    body: JSON.stringify(relationship),
   });
 }
 
@@ -145,4 +167,15 @@ async function apiSearchNetworks(query) {
 
 async function apiPersonMatches(data) {
   return apiFetch('/person-matches', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiCreateCustomRelationshipType(networkId, data) {
+  return apiFetch('/networks/' + networkId + '/relationship-types', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function apiListCustomRelationshipTypes(networkId) {
+  return apiFetch('/networks/' + networkId + '/relationship-types');
 }

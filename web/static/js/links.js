@@ -31,7 +31,16 @@ const REL_LABELS = {
   studied_at: 'studied at',
   lives_in: 'lives in',
   has_tag: 'tagged',
+  works_on: 'works on',
+  sponsors: 'sponsors',
+  partner_of: 'partner of',
+  owns: 'owns',
 };
+
+function relationshipLabel(link) {
+  if (link && link.customLabel) return link.customLabel;
+  return REL_LABELS[link.type] || link.type;
+}
 
 function renderAllLinks() {
   const layer = el('links-layer');
@@ -48,6 +57,7 @@ function renderLink(link) {
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
   if (!source || !target) return;
+  if (graph.isNodeHidden(source.id) || graph.isNodeHidden(target.id)) return;
 
   const layer = el('links-layer');
 
@@ -64,7 +74,7 @@ function renderLink(link) {
     'y': String(mid.y - 8),
     'class': 'link-label',
   });
-  text.textContent = REL_LABELS[link.type] || link.type;
+  text.textContent = relationshipLabel(link);
 
   const g = svgEl('g', { 'data-link-group': link.id });
   g.appendChild(path);
@@ -99,7 +109,7 @@ function promptDeleteLink(linkId) {
   if (!link) return;
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
-  const label = REL_LABELS[link.type] || link.type;
+  const label = relationshipLabel(link);
   const msg = `Remove relationship "${label}" between ${source ? source.label : '?'} and ${target ? target.label : '?'}?`;
   if (!confirm(msg)) return;
   const deletePromise = isTemporaryGraphMode()

@@ -84,41 +84,107 @@
     <!-- Left toolbox -->
     <aside id="toolbox">
       <div class="toolbox-section">
-        <h3 class="toolbox-heading">People</h3>
-        <button class="tool-item" data-entity="person" draggable="true">
-          <span class="tool-dot dot-person"></span>
-          <span class="tool-label">Person</span>
+        <h3 class="toolbox-heading">Navigation</h3>
+        <button class="tool-item" data-tool-action="fit-all">
+          <span class="tool-symbol">Fit</span>
+          <span class="tool-label">Fit all nodes</span>
+        </button>
+        <button class="tool-item" data-tool-action="fit-selection">
+          <span class="tool-symbol">Sel</span>
+          <span class="tool-label">Fit selection</span>
+        </button>
+        <button class="tool-item" data-tool-action="zoom-in">
+          <span class="tool-symbol">+</span>
+          <span class="tool-label">Zoom in</span>
+        </button>
+        <button class="tool-item" data-tool-action="zoom-out">
+          <span class="tool-symbol">-</span>
+          <span class="tool-label">Zoom out</span>
+        </button>
+        <button class="tool-item" data-tool-action="reset-zoom">
+          <span class="tool-symbol">1:1</span>
+          <span class="tool-label">Reset zoom</span>
         </button>
       </div>
       <div class="toolbox-section">
-        <h3 class="toolbox-heading">Organizations</h3>
-        <button class="tool-item" data-entity="company" draggable="true">
-          <span class="tool-dot dot-company"></span>
-          <span class="tool-label">Company</span>
+        <h3 class="toolbox-heading">Selection</h3>
+        <button class="tool-item" data-tool-action="select-connected">
+          <span class="tool-symbol">Net</span>
+          <span class="tool-label">Select connected</span>
         </button>
-        <button class="tool-item" data-entity="association" draggable="true">
-          <span class="tool-dot dot-association"></span>
-          <span class="tool-label">Association</span>
-        </button>
-        <button class="tool-item" data-entity="school" draggable="true">
-          <span class="tool-dot dot-school"></span>
-          <span class="tool-label">School</span>
+        <button class="tool-item" data-tool-action="clear-selection">
+          <span class="tool-symbol">Esc</span>
+          <span class="tool-label">Clear selection</span>
         </button>
       </div>
       <div class="toolbox-section">
-        <h3 class="toolbox-heading">Context</h3>
-        <button class="tool-item" data-entity="location" draggable="true">
-          <span class="tool-dot dot-location"></span>
-          <span class="tool-label">Location</span>
+        <h3 class="toolbox-heading">Graph</h3>
+        <button class="tool-item" data-tool-action="hide-selected">
+          <span class="tool-symbol">Hide</span>
+          <span class="tool-label">Hide selected</span>
         </button>
-        <button class="tool-item" data-entity="tag" draggable="true">
-          <span class="tool-dot dot-tag"></span>
-          <span class="tool-label">Tag</span>
+        <button class="tool-item" data-tool-action="show-hidden">
+          <span class="tool-symbol">Show</span>
+          <span class="tool-label">Show hidden</span>
         </button>
+        <button class="tool-item" data-tool-action="auto-layout">
+          <span class="tool-symbol">Grid</span>
+          <span class="tool-label">Auto layout</span>
+        </button>
+      </div>
+      <div class="toolbox-section create-toolbox">
+        <h3 class="toolbox-heading create-heading">Create</h3>
+        <h4 class="toolbox-subheading">Persons</h4>
+        <div class="tool-icon-grid">
+          <button class="tool-icon-button" data-entity="person" data-default-gender="m" draggable="true" title="Male person" aria-label="Create male person">
+            <span class="tool-icon icon-person-male">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            </span>
+          </button>
+          <button class="tool-icon-button" data-entity="person" data-default-gender="f" draggable="true" title="Female person" aria-label="Create female person">
+            <span class="tool-icon icon-person-female">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            </span>
+          </button>
+          <button class="tool-icon-button" data-entity="person" data-default-gender="o" draggable="true" title="Other person" aria-label="Create other person">
+            <span class="tool-icon icon-person-other">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            </span>
+          </button>
+        </div>
+        <h4 class="toolbox-subheading">Family</h4>
+        <div class="tool-icon-grid">
+          <button class="tool-icon-button tool-icon-disabled" type="button" disabled title="Family" aria-label="Create family">
+            <span class="tool-icon icon-family">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><circle cx="12" cy="15" r="3"/><path d="M3 21c0-3 2.2-5 5-5"/><path d="M21 21c0-3-2.2-5-5-5"/><path d="M7 22c0-3 2.2-5 5-5s5 2 5 5"/></svg>
+            </span>
+          </button>
+        </div>
+        <h4 class="toolbox-subheading">Project</h4>
+        <div class="tool-icon-grid">
+          <button class="tool-icon-button" data-entity="project" draggable="true" title="Project" aria-label="Create project">
+            <span class="tool-icon icon-project">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M8 5V3h8v2"/><path d="M8 10h8"/><path d="M8 14h5"/></svg>
+            </span>
+          </button>
+        </div>
+        <h4 class="toolbox-subheading">Organisation</h4>
+        <div class="tool-icon-grid">
+          <button class="tool-icon-button" data-entity="company" draggable="true" title="Company" aria-label="Create company"><span class="tool-icon icon-company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="15" rx="1"/><path d="M16 22V12h-8v10"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="association" draggable="true" title="Association" aria-label="Create association"><span class="tool-icon icon-association"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="school" draggable="true" title="School" aria-label="Create school"><span class="tool-icon icon-school"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="government" draggable="true" title="Government" aria-label="Create government"><span class="tool-icon icon-government"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18"/><path d="M5 21V10h14v11"/><path d="M12 3 3 8h18z"/><path d="M8 10v11M12 10v11M16 10v11"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="political_party" draggable="true" title="Political Party" aria-label="Create political party"><span class="tool-icon icon-political-party"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V4"/><path d="M4 5h13l-2 4 2 4H4"/><path d="M9 9h3"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="religious_organization" draggable="true" title="Religious Organization" aria-label="Create religious organization"><span class="tool-icon icon-religious-organization"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20"/><path d="M6 8h12"/><path d="M5 22h14"/><path d="M8 18c1-3 7-3 8 0"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="sports_club" draggable="true" title="Sports Club" aria-label="Create sports club"><span class="tool-icon icon-sports-club"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M6 12h12"/><path d="M12 3c3 3 3 15 0 18"/><path d="M12 3c-3 3-3 15 0 18"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="military_unit" draggable="true" title="Military Unit" aria-label="Create military unit"><span class="tool-icon icon-military-unit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="M12 7v8"/><path d="M8 11h8"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="ngo" draggable="true" title="NGO" aria-label="Create NGO"><span class="tool-icon icon-ngo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/><path d="M8 13h8"/></svg></span></button>
+          <button class="tool-icon-button" data-entity="community" draggable="true" title="Community" aria-label="Create community"><span class="tool-icon icon-community"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3"/><circle cx="6" cy="16" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 14l2-4M15 14l-2-4M9 16h6"/></svg></span></button>
+        </div>
       </div>
       <div class="toolbox-hint">
-        <p>Click to add a node.<br>Drag onto workspace.</p>
-        <p class="hint-keys"><kbd>Shift</kbd>+click to link<br><kbd>Del</kbd> to remove</p>
+        <p>Click a data tool to add a node.<br>Ctrl/Cmd-click nodes to multi-select.</p>
+        <p class="hint-keys"><kbd>Shift</kbd>+click to link<br><kbd>Esc</kbd> clears selection</p>
       </div>
     </aside>
 
@@ -177,7 +243,7 @@
     </div>
     <form id="modal-form" class="modal-body"></form>
     <div class="modal-footer">
-      <button id="modal-delete" class="btn btn-danger" style="display:none">Delete</button>
+      <button id="modal-delete" class="btn btn-danger" style="display:none">Archive</button>
       <div class="modal-footer-right">
         <button id="modal-cancel" class="btn btn-ghost">Cancel</button>
         <button id="modal-save" class="btn btn-primary">Save</button>
@@ -201,17 +267,31 @@
       <div id="link-nodes-preview" class="link-preview"></div>
       <div class="form-group">
         <label class="form-label" for="link-type-select">Relationship type</label>
-        <select id="link-type-select" class="form-select">
-          <option value="knows">Knows</option>
-          <option value="spouse_of">Spouse of</option>
-          <option value="parent_of">Parent of</option>
-          <option value="sibling_of">Sibling of</option>
-          <option value="works_at">Works at</option>
-          <option value="member_of">Member of</option>
-          <option value="studied_at">Studied at</option>
-          <option value="lives_in">Lives in</option>
-          <option value="has_tag">Has tag</option>
-        </select>
+        <select id="link-type-select" class="form-select"></select>
+      </div>
+      <div id="link-custom-group" class="form-group" style="display:none">
+        <label class="form-label" for="link-custom-label">Custom relationship</label>
+        <input id="link-custom-label" class="form-input" type="text" placeholder="hates, mentors, advises..." />
+      </div>
+      <div id="link-role-group" class="form-group" style="display:none">
+        <label class="form-label" for="link-role">Role / context</label>
+        <input id="link-role" class="form-input" type="text" placeholder="Sales Manager, Developer, Chairman..." />
+      </div>
+      <div id="link-dates-group" class="form-row" style="display:none">
+        <div class="form-group">
+          <label class="form-label" for="link-start">Start</label>
+          <input id="link-start" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="link-end">End</label>
+          <input id="link-end" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+        </div>
+      </div>
+      <div id="link-current-group" class="form-group" style="display:none">
+        <label class="form-check">
+          <input id="link-current" type="checkbox" />
+          <span class="form-check-label">Current</span>
+        </label>
       </div>
       <div class="form-group">
         <label class="form-label" for="link-notes">Notes</label>

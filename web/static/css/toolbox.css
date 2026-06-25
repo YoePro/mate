@@ -1,5 +1,5 @@
 #toolbox {
-  width: 160px;
+  width: 168px;
   flex-shrink: 0;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
@@ -22,6 +22,21 @@
   color: var(--text-muted);
   padding: 4px 8px;
   margin-bottom: 2px;
+}
+
+.create-heading {
+  color: var(--text-primary);
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.toolbox-subheading {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px 8px 5px;
 }
 
 .tool-item {
@@ -58,6 +73,21 @@
   flex-shrink: 0;
 }
 
+.tool-symbol {
+  width: 28px;
+  min-width: 28px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .dot-person      { background: var(--node-person); }
 .dot-company     { background: var(--node-company); }
 .dot-association { background: var(--node-association); }
@@ -69,6 +99,98 @@
   font-size: 13px;
   font-weight: 500;
 }
+
+.tool-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tool-item:disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.create-toolbox {
+  padding-top: 2px;
+}
+
+.tool-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  padding: 0 6px 2px;
+}
+
+.tool-icon-button {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+}
+
+.tool-icon-button:hover {
+  background: var(--bg-elevated);
+  border-color: var(--node-color, var(--accent));
+  color: var(--text-primary);
+}
+
+.tool-icon-button:active {
+  transform: translateY(1px);
+}
+
+.tool-icon-button.active {
+  background: var(--accent-dim);
+  border-color: var(--node-color, var(--accent));
+  box-shadow: inset 0 0 0 1px var(--node-color, var(--accent));
+}
+
+.tool-icon-button:disabled,
+.tool-icon-button:disabled:hover {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+.tool-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--node-color, var(--text-muted));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.icon-person-male { --node-color: var(--node-person-male); }
+.icon-person-female { --node-color: var(--node-person-female); }
+.icon-person-other { --node-color: var(--node-person-other); }
+.icon-family { --node-color: var(--text-muted); }
+.icon-company { --node-color: var(--node-company); }
+.icon-association { --node-color: var(--node-association); }
+.icon-school { --node-color: var(--node-school); }
+.icon-government { --node-color: var(--node-government); }
+.icon-political-party { --node-color: var(--node-political-party); }
+.icon-religious-organization { --node-color: var(--node-religious-organization); }
+.icon-sports-club { --node-color: var(--node-sports-club); }
+.icon-military-unit { --node-color: var(--node-military-unit); }
+.icon-ngo { --node-color: var(--node-ngo); }
+.icon-community { --node-color: var(--node-community); }
+.icon-project { --node-color: var(--node-project); }
 
 .toolbox-hint {
   margin-top: auto;

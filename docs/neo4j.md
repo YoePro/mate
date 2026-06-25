@@ -20,6 +20,9 @@ MATE creates constraints for:
 - `PersonAttribute.id`
 - `Organization.id`
 - `OrganizationAttribute.id`
+- `Project.id`
+- `CustomRelationshipType.id`
+- `CustomRelationshipType.network_id`, `CustomRelationshipType.key`, `CustomRelationshipType.source_type`, and `CustomRelationshipType.target_type`
 - `Position.node_id` and `Position.node_type`
 - `Network.id`
 - `NetworkPosition.network_id`, `NetworkPosition.node_id`, and `NetworkPosition.node_type`
@@ -32,19 +35,56 @@ Current graph labels:
 - `PersonAttribute`
 - `Organization`
 - `OrganizationAttribute`
+- `Project`
+- `CustomRelationshipType`
 - `Position`
 - `Network`
 - `NetworkPosition`
 
-Relationship types are created from the supported MATE relationship types, such as `knows`, `works_at`, and `member_of`.
+Relationship types are created from the supported MATE relationship types, such as `knows`, `works_at`, `member_of`, `works_on`, and `sponsors`.
+
+Custom relationship edges use validated dynamic relationship types with a `custom_` prefix, for example `custom_hates`. Reusable metadata for these types is stored as `CustomRelationshipType` nodes scoped to a network.
 
 Network relationships:
 
 - `(:Account)-[:OWNS_NETWORK]->(:Network)`
 - `(:Network)-[:CONTAINS_PERSON]->(:Person)`
 - `(:Network)-[:HAS_POSITION]->(:NetworkPosition)`
+- `(:Network)-[:HAS_CUSTOM_RELATIONSHIP_TYPE]->(:CustomRelationshipType)`
 
 `CONTAINS_PERSON` stores network-specific `notes`, `context`, and `archived` properties.
+
+`CustomRelationshipType` stores:
+
+- `network_id`
+- `owner_id`
+- `key`
+- `label`
+- `source_type`
+- `target_type`
+- `direction_behavior`
+- `archived`
+
+Relationship edges may store:
+
+- `source_type`
+- `target_type`
+- `custom_label`
+- `role`
+- `start_date`
+- `end_date`
+- `current`
+- `notes`
+
+## 0.11 taxonomy decisions
+
+Project is implemented as a first-class `Project` node.
+
+Organization subtypes are stored as `Organization.type`; they are not separate labels.
+
+Event and Family are not implemented as graph nodes in 0.11. Event remains an open workflow decision. Family remains an open model decision and may become a group/entity, network concept, or relationship cluster later.
+
+Location and Tag are still legacy graph placeholders and should be revisited before deeper 1.0 behavior is built on top of them.
 
 ## Unavailable database behavior
 

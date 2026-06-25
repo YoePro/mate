@@ -19,10 +19,21 @@
   --warning:       #f59e0b;
   --error:         #ef4444;
 
-  --node-person:      #3b82f6;
+  --node-person:      #64748b;
+  --node-person-male: #3b82f6;
+  --node-person-female: #ec4899;
+  --node-person-other: #64748b;
   --node-company:     #10b981;
   --node-association: #f59e0b;
   --node-school:      #ef4444;
+  --node-government:  #6366f1;
+  --node-political-party: #14b8a6;
+  --node-religious-organization: #a855f7;
+  --node-sports-club: #84cc16;
+  --node-military-unit: #475569;
+  --node-ngo:         #0ea5e9;
+  --node-community:   #f97316;
+  --node-project:     #22c55e;
   --node-location:    #06b6d4;
   --node-tag:         #8b5cf6;
 

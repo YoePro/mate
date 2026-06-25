@@ -37,6 +37,8 @@ func createRouter(store storage.Storage) *http.ServeMux {
 	mux.HandleFunc("/api/v1/persons/", api.Person)
 	mux.HandleFunc("/api/v1/organizations", api.Organizations)
 	mux.HandleFunc("/api/v1/organizations/", api.Organization)
+	mux.HandleFunc("/api/v1/projects", api.Projects)
+	mux.HandleFunc("/api/v1/projects/", api.Project)
 	mux.HandleFunc("/api/v1/relationships", api.Relationships)
 	mux.HandleFunc("/api/v1/relationships/", api.Relationship)
 	mux.HandleFunc("/api/v1/positions", api.Positions)

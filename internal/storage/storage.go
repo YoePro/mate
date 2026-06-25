@@ -34,6 +34,8 @@ type Storage interface {
 	ArchiveNetworkPerson(ctx context.Context, networkID string, personID string) error
 	SaveNetworkPosition(ctx context.Context, networkID string, position models.Position) error
 	GetNetworkGraph(ctx context.Context, networkID string) (*models.NetworkGraphResponse, error)
+	CreateCustomRelationshipType(ctx context.Context, relationshipType models.CustomRelationshipType) (*models.CustomRelationshipType, error)
+	ListCustomRelationshipTypes(ctx context.Context, networkID string) ([]models.CustomRelationshipType, error)
 	ListPersonNetworkIDs(ctx context.Context, personID string) ([]string, error)
 	MergePersons(ctx context.Context, survivorID string, removedID string) (*models.Person, error)
 
@@ -58,6 +60,12 @@ type Storage interface {
 	ListOrganizationAttributes(ctx context.Context, organizationID string) ([]models.OrganizationAttribute, error)
 	UpdateOrganizationAttribute(ctx context.Context, attribute models.OrganizationAttribute) (*models.OrganizationAttribute, error)
 	ArchiveOrganizationAttribute(ctx context.Context, organizationID string, attributeID string) error
+
+	CreateProject(ctx context.Context, project models.Project) (*models.Project, error)
+	GetProject(ctx context.Context, id string) (*models.Project, error)
+	ListProjects(ctx context.Context) ([]models.Project, error)
+	UpdateProject(ctx context.Context, project models.Project) (*models.Project, error)
+	DeleteProject(ctx context.Context, id string) error
 
 	CreateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error)
 	GetRelationship(ctx context.Context, id string) (*models.Relationship, error)

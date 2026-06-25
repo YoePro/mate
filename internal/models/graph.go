@@ -12,6 +12,7 @@ type Position struct {
 type GraphResponse struct {
 	Persons       []Person         `json:"persons"`
 	Organizations []Organization   `json:"organizations"`
+	Projects      []Project        `json:"projects"`
 	Locations     []map[string]any `json:"locations"`
 	Tags          []map[string]any `json:"tags"`
 	Relationships []Relationship   `json:"relationships"`

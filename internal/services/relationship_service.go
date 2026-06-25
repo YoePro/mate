@@ -14,7 +14,15 @@ type RelationshipService struct {
 
 // Create creates a relationship.
 func (s *RelationshipService) Create(ctx context.Context, relationship models.Relationship) (*models.Relationship, error) {
+	relationship.CustomLabel = normalizeSpace(relationship.CustomLabel)
+	relationship.Role = normalizeSpace(relationship.Role)
+	relationship.StartDate = normalizeSpace(relationship.StartDate)
+	relationship.EndDate = normalizeSpace(relationship.EndDate)
+	relationship.Notes = normalizeSpace(relationship.Notes)
 	if relationship.SourceID == "" || relationship.TargetID == "" || !validRelationshipType(relationship.Type) {
+		return nil, ErrInvalidInput
+	}
+	if validCustomRelationshipType(string(relationship.Type)) && relationship.CustomLabel == "" {
 		return nil, ErrInvalidInput
 	}
 	if relationship.ID == "" {

@@ -249,7 +249,9 @@ These are not required for 1.0 unless explicitly pulled forward.
 * Recently added
 * Recently modified
 
+=============================================================================================================================================================================================
 0.1 Development
+=============================================================================================================================================================================================
 
 Goal:
 Create the minimal Go application structure and prove that the backend can start and answer a request.
@@ -312,6 +314,7 @@ Documentation checklist:
 * `README.md` or docs include `.mate.ini` usage and configuration file guidance.
 * Roadmap explains version logic.
 
+=============================================================================================================================================================================================
 0.1.1 Development patch
 
 Goal:
@@ -347,7 +350,9 @@ Documentation checklist:
 * Update roadmap.txt if structure changes.
 * Update docs/api.md if endpoint behavior changes.
 
+=============================================================================================================================================================================================
 0.2 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize the backend skeleton.
@@ -394,7 +399,9 @@ Documentation checklist:
 * Update roadmap.txt with any structural corrections.
 * Document current project folder responsibilities.
 
+=============================================================================================================================================================================================
 0.3 Development
+=============================================================================================================================================================================================
 
 Goal:
 Serve the web frontend from the Go backend.
@@ -466,7 +473,9 @@ Documentation checklist:
 * CSS README explains purpose of each CSS file.
 * JS README explains purpose of each JS file.
 
+=============================================================================================================================================================================================
 0.4 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize the frontend loading and static file delivery.
@@ -510,7 +519,9 @@ Documentation checklist:
 * Add manual frontend smoke test section if not already documented.
 * Document expected local development URL.
 
+=============================================================================================================================================================================================
 0.5 Development
+=============================================================================================================================================================================================
 
 Goal:
 Build the first Node RED inspired graph UI shell.
@@ -577,6 +588,7 @@ Documentation checklist:
 * CSS README explains graph.css and toolbox.css.
 * Add short UI concept notes to roadmap or docs.
 
+=============================================================================================================================================================================================
 0.5.1 Development patch
 
 Goal:
@@ -614,7 +626,9 @@ Documentation checklist:
 * Update JS README if responsibilities change.
 * Update CSS README if new style sections are added.
 
+=============================================================================================================================================================================================
 0.6 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize the graph UI shell.
@@ -664,7 +678,9 @@ Documentation checklist:
 * Document known limitations.
 * Document next integration step.
 
+=============================================================================================================================================================================================
 0.7 Development
+=============================================================================================================================================================================================
 
 Goal:
 Add real backend API structure and Neo4j-backed storage.
@@ -948,7 +964,9 @@ Documentation checklist:
 * Add docs/neo4j.md.
 * Document Neo4j setup and expected local development configuration.
 
+=============================================================================================================================================================================================
 0.8 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize API, services, frontend integration, and Neo4j-backed behavior.
@@ -1033,7 +1051,9 @@ Documentation checklist:
 * Document authentication limitations before full beta hardening.
 * Document role permissions.
 
+=============================================================================================================================================================================================
 0.9 Development
+=============================================================================================================================================================================================
 
 Goal:
 Add user-owned networks and duplicate-aware person creation.
@@ -1207,7 +1227,9 @@ Documentation checklist:
 * docs/accounts.md documents network ownership permissions.
 * roadmap.txt keeps explicit note that non-owners cannot edit networks they do not own.
 
+=============================================================================================================================================================================================
 0.10 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize user-owned networks, network permissions, duplicate detection, and merge behavior from 0.9.
@@ -1295,7 +1317,9 @@ Documentation checklist:
 * docs/accounts.md updated with final 0.10 network permission behavior.
 * Document duplicate detection limitations and expected false positives/false negatives.
 
+=============================================================================================================================================================================================
 0.11 Development
+=============================================================================================================================================================================================
 
 Goal:
 Continue product development after network ownership and duplicate detection are stabilized.
@@ -1371,6 +1395,18 @@ Implementation checklist:
   * other/unknown: neutral or existing fallback color
 * Ensure gender colors do not break selection, hover, accessibility, or existing organization colors.
 
+0.11 completion notes:
+
+* Person, Organization, and Project are the active top-level entity model for this version.
+* Project is implemented as a first-class graph entity with API, service, storage, frontend creation, graph rendering, and project-aware relationship options.
+* Organization subtypes remain under Organization.type and include company, association, school, government, political party, religious organization, sports club, military unit, NGO, and community.
+* Event is deferred until a concrete workflow proves whether it should be a graph node or an attached timeline/context object.
+* Family is deferred as a storage model decision; the UI may show it as planned/disabled but it is not implemented as a graph node in 0.11.
+* Location and Tag remain legacy graph placeholders and should be revisited before deeper 1.0 behavior depends on them.
+* Custom relationship types are network-owned metadata and are stored under the owning network.
+* Relationship creation supports type-aware options, custom relationship labels, and structured context fields.
+* Archive is the normal UI action where supported; organization and project delete endpoints now archive instead of physically deleting.
+
 Acceptance criteria:
 
 * Broad entity taxonomy is documented before adding new concrete node types.
@@ -1420,7 +1456,9 @@ Documentation checklist:
 * Update docs/neo4j.md with relationship type metadata schema and any Project/Event/Family modeling decisions.
 * Update frontend smoke test documentation for type-aware links, relationship attributes, and gender colors.
 
+=============================================================================================================================================================================================
 0.12 Debug
+=============================================================================================================================================================================================
 
 Goal:
 Stabilize entity taxonomy, type-aware relationship behavior, gender coloring, and grouped UI tools from 0.11.
@@ -1538,7 +1576,155 @@ Documentation checklist:
 * docs/frontend-smoke-test.md updated for grouped tools.
 * docs/accounts.md updated if any tool-level permission behavior changes.
 
+=============================================================================================================================================================================================
+0.13 Development
+=============================================================================================================================================================================================
+
+Goal:
+Improve graph usability and continue domain modeling after the 0.11 entity and relationship work has been stabilized in 0.12.
+
+Scope:
+This version should focus on UX polish, safer graph manipulation, and the next set of domain modeling decisions. Features already delivered in 0.9 or 0.11 should not be reimplemented here. 0.13 may add new models, but only after the model decision is explicit enough to test.
+
+Already delivered before 0.13 and not repeated in this scope:
+
+* User-owned networks.
+* Global persons that can belong to multiple networks.
+* Network-specific person notes/context and graph positions.
+* Project as a first-class top-level graph entity.
+* Organization subtypes under Organization.type.
+* Modifier-key multi-select.
+* Select connected nodes.
+* Fit all nodes and fit selection.
+
+Implementation checklist:
+
+* Improve first-load graph framing:
+
+  * Auto-center or fit the selected network graph after load when useful.
+  * Avoid fighting explicit user pan/zoom after the first graph frame.
+* Replace browser modal primitives:
+
+  * Replace alert dialogs with real HTML dialogs.
+  * Replace confirm dialogs with real HTML dialogs.
+  * Replace prompt dialogs with real HTML dialogs.
+  * Reuse the same dialog foundation for network create/rename, delete/archive confirmation, relationship creation errors, and other UI actions.
+* Improve empty and neutral UI states:
+
+  * Replace misleading "Could not load attributes" copy with neutral empty states such as "No attributes" when the request succeeds but no data exists.
+  * Keep real errors distinguishable from empty data.
+* Add color configuration:
+
+  * Allow choosing colors for supported node types or subtypes.
+  * Persist chosen colors in an appropriate scope.
+  * Decide whether color preferences are global, account-owned, or network-owned before storage is added.
+* Improve person title modeling:
+
+  * Split honorifics from positions.
+  * Honorific examples include Dr., Prof., HRH, HM, Sir, and similar forms.
+  * Position examples include CEO, Chairman, Sales Manager, Developer, Teacher, and similar roles.
+  * Support multiple positions per person.
+  * Positions should support optional start and end dates.
+  * Positions should optionally reference an Organization when applicable.
+* Add missing selection behavior:
+
+  * Implement drag-box selection with the mouse.
+  * Keep modifier-key multi-select behavior.
+  * Add Select same node type.
+  * Ensure selection tools work with hidden nodes and filtered graph state.
+* Add node safety tools:
+
+  * Add node locking to prevent accidental movement.
+  * Make auto layout respect locked nodes.
+  * Add unlock behavior.
+  * Decide whether lock state is persisted globally or per network.
+* Add right-click context menus:
+
+  * Provide context menus for all visible node types.
+  * Include common actions such as edit, archive, create relationship, fit selection, hide, lock, and unlock where relevant.
+  * Add reusable context creation actions while keeping toolbox creation available.
+* Decide and implement the next domain entity model:
+
+  * Decide whether Family should be a first-class node, a group/entity, a network concept, or a relationship cluster.
+  * If Family is implemented, add API, storage, graph rendering, creation UI, relationship options, and tests.
+  * Decide whether Event should be a first-class node or an attached timeline/context object.
+  * If Event is implemented, support event categories such as meeting, wedding, conference, birthday, trip, dinner, and school reunion.
+  * Decide whether Interest should be a first-class node, a tag-like classification, or a profile attribute.
+  * If Interest is implemented, define how it differs from Tag.
+* Prepare for future collaboration:
+
+  * Keep network-owned private information private by default.
+  * Do not introduce implicit sharing.
+  * Ensure new model decisions do not break future explicit collaboration permissions.
+
+Acceptance criteria:
+
+* 0.13 does not reimplement completed 0.9 or 0.11 features as new work.
+* New network graph load frames the graph usefully without disrupting later user navigation.
+* Browser-native alert, confirm, and prompt dialogs are no longer used in the normal graph UI flows touched by this version.
+* Attribute empty states distinguish empty data from real load failures.
+* Color customization has a decided ownership scope before persistence is added.
+* Person honorifics and positions are no longer forced into one field.
+* A person can have multiple dated positions if the position model is implemented in this version.
+* Drag-box selection works together with existing modifier-key selection.
+* Select same node type works for supported graph node types.
+* Locked nodes cannot be moved accidentally.
+* Auto layout does not move locked nodes.
+* Right-click context menus expose relevant actions without replacing the toolbox.
+* Family, Event, and Interest each have an explicit model decision, even if only one of them is implemented in 0.13.
+* Any newly implemented entity type has API, storage, frontend creation, graph rendering, and relationship behavior sufficient for manual testing.
+* Network ownership boundaries remain intact.
+
+Test checklist:
+
+* Run go test ./...
+* Run go vet ./...
+* Run frontend JavaScript syntax checks.
+* Test graph auto-centering on network load with:
+
+  * empty graph
+  * one node
+  * many nodes
+  * after user has panned or zoomed
+* Test all replaced HTML dialogs:
+
+  * create network
+  * rename network
+  * archive/delete confirmation
+  * custom relationship creation
+  * relevant error flows
+* Test attribute empty state versus real API failure.
+* Test color selection and persistence if implemented.
+* Test honorific and multiple dated position behavior if implemented.
+* Test position-to-organization references if implemented.
+* Test drag-box selection.
+* Test modifier-key selection still works after drag selection is added.
+* Test Select same node type.
+* Test node locking.
+* Test auto layout with locked and unlocked nodes.
+* Test right-click context menus for:
+
+  * Person
+  * Organization
+  * Project
+  * any new entity type implemented in 0.13
+* Test context creation actions.
+* Test the selected Family/Event/Interest modeling decision.
+* Test non-owner direct API calls for every new network-scoped behavior.
+* Test browser reload after using new UI state such as colors, locks, dialogs, or new entities.
+
+Documentation checklist:
+
+* Update docs/api.md for any new or changed endpoints.
+* Update docs/storage.md for new model decisions and storage ownership scope.
+* Update docs/neo4j.md for new labels, relationship metadata, constraints, and indexes.
+* Update docs/frontend-smoke-test.md with 0.13 graph UX checks.
+* Update docs/ui-concept.md if context menus, dialogs, or toolbox behavior materially change.
+* Update roadmap.txt with completion notes when 0.13 is done.
+
+=============================================================================================================================================================================================
 1.0 Stable
+=============================================================================================================================================================================================
 
 Goal:
 Release the first stable local version of MATE after the required 0.x development and stabilization cycles are complete.
@@ -1672,7 +1858,9 @@ Documentation checklist:
 
 Future 1.x
 
+=============================================================================================================================================================================================
 1.1 Development
+=============================================================================================================================================================================================
 
 * Improve account management workflows.
 * Add create-account window if it was not completed before 1.0.

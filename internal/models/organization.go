@@ -4,12 +4,19 @@ package models
 type OrganizationType string
 
 const (
-	OrganizationCompany     OrganizationType = "company"
-	OrganizationAssociation OrganizationType = "association"
-	OrganizationSchool      OrganizationType = "school"
+	OrganizationCompany               OrganizationType = "company"
+	OrganizationAssociation           OrganizationType = "association"
+	OrganizationSchool                OrganizationType = "school"
+	OrganizationGovernment            OrganizationType = "government"
+	OrganizationPoliticalParty        OrganizationType = "political_party"
+	OrganizationReligiousOrganization OrganizationType = "religious_organization"
+	OrganizationSportsClub            OrganizationType = "sports_club"
+	OrganizationMilitaryUnit          OrganizationType = "military_unit"
+	OrganizationNGO                   OrganizationType = "ngo"
+	OrganizationCommunity             OrganizationType = "community"
 )
 
-// Organization represents a company, association, or school.
+// Organization represents an organization subtype such as company, school, or club.
 type Organization struct {
 	ID          string           `json:"id"`
 	Name        string           `json:"name"`
@@ -20,6 +27,7 @@ type Organization struct {
 	Aliases     []string         `json:"aliases,omitempty"`
 	Active      bool             `json:"active"`
 	Web         string           `json:"web,omitempty"`
+	Archived    bool             `json:"archived,omitempty"`
 }
 
 // OrganizationAttributeType defines time-bound organization attribute categories.

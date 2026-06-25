@@ -54,6 +54,38 @@ const canvas = (() => {
     applyTransform();
   }
 
+  function centerOnNodes(nodes) {
+    if (!nodes.length) return;
+    const rect = workspace.getBoundingClientRect();
+    const cx = nodes.reduce((sum, node) => sum + node.x, 0) / nodes.length;
+    const cy = nodes.reduce((sum, node) => sum + node.y, 0) / nodes.length;
+    tx = rect.width / 2 - cx * scale;
+    ty = rect.height / 2 - cy * scale;
+    applyTransform();
+  }
+
+  function setZoom(nextScale) {
+    const rect = workspace.getBoundingClientRect();
+    const mx = rect.width / 2;
+    const my = rect.height / 2;
+    const newScale = Math.max(0.2, Math.min(3, nextScale));
+    tx = mx - (mx - tx) * (newScale / scale);
+    ty = my - (my - ty) * (newScale / scale);
+    scale = newScale;
+    applyTransform();
+  }
+
+  function zoomBy(factor) {
+    setZoom(scale * factor);
+  }
+
+  function resetZoom() {
+    scale = 1;
+    tx = 0;
+    ty = 0;
+    applyTransform();
+  }
+
   function startPan(e) {
     isPanning = true;
     panStart = { x: e.clientX - tx, y: e.clientY - ty };
@@ -113,5 +145,14 @@ const canvas = (() => {
 
   applyTransform();
 
-  return { screenToWorld, worldToScreen, fitToNodes, applyTransform, getScale: () => scale };
+  return {
+    screenToWorld,
+    worldToScreen,
+    fitToNodes,
+    centerOnNodes,
+    zoomBy,
+    resetZoom,
+    applyTransform,
+    getScale: () => scale,
+  };
 })();

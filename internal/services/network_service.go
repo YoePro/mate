@@ -170,6 +170,42 @@ func (s *NetworkService) SavePosition(ctx context.Context, actor *models.Account
 	return s.store.SaveNetworkPosition(ctx, networkID, position)
 }
 
+// CreateCustomRelationshipType creates or updates a reusable custom relationship type for an owned network.
+func (s *NetworkService) CreateCustomRelationshipType(ctx context.Context, actor *models.Account, networkID string, relationshipType models.CustomRelationshipType) (*models.CustomRelationshipType, error) {
+	if err := s.requireOwner(ctx, actor, networkID); err != nil {
+		return nil, err
+	}
+	relationshipType.NetworkID = networkID
+	relationshipType.OwnerID = actor.ID
+	relationshipType.Key = normalizeSpace(relationshipType.Key)
+	relationshipType.Label = normalizeSpace(relationshipType.Label)
+	relationshipType.SourceType = normalizeSpace(relationshipType.SourceType)
+	relationshipType.TargetType = normalizeSpace(relationshipType.TargetType)
+	relationshipType.DirectionBehavior = normalizeSpace(relationshipType.DirectionBehavior)
+	if relationshipType.DirectionBehavior == "" {
+		relationshipType.DirectionBehavior = "directed"
+	}
+	if relationshipType.ID == "" {
+		relationshipType.ID = newID("reltype")
+	}
+	if relationshipType.Label == "" ||
+		relationshipType.SourceType == "" ||
+		relationshipType.TargetType == "" ||
+		!validCustomRelationshipType(relationshipType.Key) ||
+		!validCustomRelationshipDirection(relationshipType.DirectionBehavior) {
+		return nil, ErrInvalidInput
+	}
+	return s.store.CreateCustomRelationshipType(ctx, relationshipType)
+}
+
+// ListCustomRelationshipTypes lists reusable custom relationship types for an owned network.
+func (s *NetworkService) ListCustomRelationshipTypes(ctx context.Context, actor *models.Account, networkID string) ([]models.CustomRelationshipType, error) {
+	if err := s.requireOwner(ctx, actor, networkID); err != nil {
+		return nil, err
+	}
+	return s.store.ListCustomRelationshipTypes(ctx, networkID)
+}
+
 // MatchPersons returns duplicate suggestions for global persons.
 func (s *NetworkService) MatchPersons(ctx context.Context, actor *models.Account, req models.PersonMatchRequest) ([]models.PersonMatchSuggestion, error) {
 	if err := requireActiveActor(actor); err != nil {

@@ -14,11 +14,30 @@ function isTemporaryGraphMode() {
 }
 
 function isOrganizationEntityType(entityType) {
-  return entityType === 'company' || entityType === 'association' || entityType === 'school';
+  return [
+    'company',
+    'association',
+    'school',
+    'government',
+    'political_party',
+    'religious_organization',
+    'sports_club',
+    'military_unit',
+    'ngo',
+    'community',
+  ].includes(entityType);
 }
 
 function isTemporaryApiError(err) {
   return err && /^(404|501)\b/.test(err.message || '');
+}
+
+function isArchiveAction(entityType) {
+  return entityType === 'project' || isOrganizationEntityType(entityType) || (entityType === 'person' && window.currentNetworkId);
+}
+
+function destructiveActionLabel(entityType) {
+  return isArchiveAction(entityType) ? 'Archive' : 'Delete';
 }
 
 function createTemporaryEntity(entityType, data) {
@@ -27,24 +46,24 @@ function createTemporaryEntity(entityType, data) {
     temporary: true,
   });
 
-  if (entityType === 'company' || entityType === 'association' || entityType === 'school') {
+  if (isOrganizationEntityType(entityType)) {
     record.type = entityType;
   }
 
   return record;
 }
 
-function createTemporaryRelationship(source, target, type, notes) {
-  return {
+function createTemporaryRelationship(source, target, type, data) {
+  return Object.assign({
     id: `tmp-rel-${Date.now()}-${temporaryIdCounter++}`,
     source_id: source.id,
     source_type: source.entityType,
     target_id: target.id,
     target_type: target.entityType,
     type,
-    notes: notes || null,
+  }, data || {}, {
     temporary: true,
-  };
+  });
 }
 
 function localOnlyWarning(action, err) {
@@ -56,6 +75,7 @@ function localOnlyWarning(action, err) {
 let currentAccount = null;
 let currentNetwork = null;
 let ownedNetworks = [];
+let currentCustomRelationshipTypes = [];
 window.currentNetworkId = null;
 
 async function boot() {
@@ -81,10 +101,10 @@ async function boot() {
     updateLinksForNode(node.id);
   });
   graph.on('links-changed', renderAllLinks);
-  graph.on('selection-changed', (id) => {
-    updateNodeSelection(id);
-    if (id) {
-      renderInspector(id);
+  graph.on('selection-changed', () => {
+    updateNodeSelection();
+    if (graph.selectedNodeId) {
+      renderInspector(graph.selectedNodeId);
       el('inspector').classList.remove('inspector-hidden');
     } else {
       el('inspector').classList.add('inspector-hidden');
@@ -99,6 +119,7 @@ async function loadGraph() {
   setStatus('loading');
   try {
     if (!window.currentNetworkId) {
+      currentCustomRelationshipTypes = [];
       graph.clear();
       renderAllNodes();
       renderAllLinks();
@@ -106,6 +127,7 @@ async function loadGraph() {
       return;
     }
     const data = await apiLoadAll();
+    currentCustomRelationshipTypes = data.custom_relationship_types || [];
     graph.load(data);
     renderAllNodes();
     renderAllLinks();
@@ -451,7 +473,8 @@ function renderInspector(nodeId) {
       const relName = createEl('span', 'inspector-rel-name');
       relName.textContent = other.label || '?';
       const relType = createEl('span', 'inspector-rel-type');
-      relType.textContent = REL_LABELS[link.type] || link.type;
+      const context = [link.role, link.startDate, link.endDate].filter(Boolean).join(', ');
+      relType.textContent = context ? `${relationshipLabel(link)} (${context})` : relationshipLabel(link);
       item.appendChild(dot);
       item.appendChild(relName);
       item.appendChild(relType);
@@ -565,6 +588,19 @@ const FORM_FIELDS = {
     { key: 'web', label: 'Web / Reference', type: 'text' },
     { key: 'notes', label: 'Notes', type: 'textarea' },
   ],
+  organization: [
+    { key: 'name', label: 'Organization name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
+  project: [
+    { key: 'name', label: 'Project name', type: 'text', required: true },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'web', label: 'Web / Reference', type: 'text' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ],
   location:    [{ key: 'name', label: 'Location name',    type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
   tag:         [{ key: 'name', label: 'Tag name',         type: 'text', required: true }],
 };
@@ -612,6 +648,52 @@ const ATTRIBUTE_TYPES = {
   ],
 };
 
+const RELATIONSHIP_OPTIONS = {
+  'person:person': [
+    ['knows', 'Knows'],
+    ['spouse_of', 'Spouse of'],
+    ['parent_of', 'Parent of'],
+    ['sibling_of', 'Sibling of'],
+  ],
+  'person:organization': [
+    ['works_at', 'Works at'],
+    ['member_of', 'Member of'],
+    ['studied_at', 'Studied at'],
+  ],
+  'organization:person': [
+    ['member_of', 'Has member'],
+    ['works_at', 'Employs'],
+  ],
+  'organization:organization': [
+    ['partner_of', 'Partner of'],
+    ['owns', 'Owns'],
+    ['sponsors', 'Sponsors'],
+  ],
+  'person:location': [
+    ['lives_in', 'Lives in'],
+  ],
+  'person:tag': [
+    ['has_tag', 'Has tag'],
+  ],
+  'organization:tag': [
+    ['has_tag', 'Has tag'],
+  ],
+  'person:project': [
+    ['works_on', 'Works on'],
+  ],
+  'organization:project': [
+    ['sponsors', 'Sponsors'],
+  ],
+};
+
+const RELATIONSHIP_CONTEXT_TYPES = new Set([
+  'works_at',
+  'member_of',
+  'studied_at',
+  'works_on',
+  'sponsors',
+]);
+
 function initModals() {
   el('modal-close').addEventListener('click', closeModal);
   el('modal-cancel').addEventListener('click', closeModal);
@@ -622,14 +704,14 @@ function initModals() {
   el('modal-delete').addEventListener('click', handleModalDelete);
 }
 
-function openAddModal(entityType, x, y) {
+function openAddModal(entityType, x, y, defaults) {
   modalEntityType = entityType;
   modalEntityId = null;
   modalX = x;
   modalY = y;
   el('modal-title').textContent = `Add ${ENTITY_LABELS[entityType] || entityType}`;
   el('modal-delete').style.display = 'none';
-  buildModalForm(entityType, null);
+  buildModalForm(entityType, defaults || null);
   el('modal-overlay').classList.remove('modal-hidden');
   const first = qs('.form-input', el('modal-form'));
   if (first) first.focus();
@@ -642,6 +724,7 @@ function openEditModal(nodeId) {
   modalEntityId = nodeId;
   el('modal-title').textContent = `Edit ${ENTITY_LABELS[node.entityType] || node.entityType}`;
   el('modal-delete').style.display = 'inline-flex';
+  el('modal-delete').textContent = destructiveActionLabel(node.entityType);
   buildModalForm(node.entityType, node.data);
   el('modal-overlay').classList.remove('modal-hidden');
 }
@@ -649,7 +732,7 @@ function openEditModal(nodeId) {
 function buildModalForm(entityType, data) {
   const form = el('modal-form');
   clearChildren(form);
-  const fields = FORM_FIELDS[entityType] || [];
+  const fields = FORM_FIELDS[entityType] || (isOrganizationEntityType(entityType) ? FORM_FIELDS.organization : []);
 
   fields.forEach(field => {
     const group = createEl('div', 'form-group');
@@ -787,7 +870,8 @@ async function maybeUseExistingPerson(data) {
 async function handleModalDelete() {
   if (!modalEntityId) return;
   const node = graph.getNode(modalEntityId);
-  if (!confirm(`Delete "${node ? node.label : '?'}"? This will also remove all relationships.`)) return;
+  const action = destructiveActionLabel(modalEntityType);
+  if (!confirm(`${action} "${node ? node.label : '?'}"?`)) return;
 
   try {
     if (!isTemporaryGraphMode()) {
@@ -795,15 +879,15 @@ async function handleModalDelete() {
         await apiDelete(modalEntityType, modalEntityId);
       } catch (err) {
         if (!isTemporaryApiError(err)) throw err;
-        localOnlyWarning('Node delete', err);
+        localOnlyWarning(`Node ${action.toLowerCase()}`, err);
       }
     }
     removeNodeEl(modalEntityId);
     graph.removeNode(modalEntityId);
     closeModal();
   } catch (err) {
-    console.error('Delete failed:', err);
-    alert('Could not delete. Please try again.');
+    console.error(`${action} failed:`, err);
+    alert(`Could not ${action.toLowerCase()}. Please try again.`);
   }
 }
 
@@ -903,12 +987,86 @@ async function handleAttributeSave() {
 let linkSourceNodeId = null;
 let linkTargetNodeId = null;
 
+function broadEntityType(entityType) {
+  if (entityType === 'person') return 'person';
+  if (isOrganizationEntityType(entityType)) return 'organization';
+  if (entityType === 'project') return 'project';
+  if (entityType === 'location') return 'location';
+  if (entityType === 'tag') return 'tag';
+  return entityType;
+}
+
+function relationshipOptionsFor(source, target) {
+  const directKey = `${broadEntityType(source.entityType)}:${broadEntityType(target.entityType)}`;
+  const direct = RELATIONSHIP_OPTIONS[directKey];
+  let options = direct || null;
+
+  const reverseKey = `${broadEntityType(target.entityType)}:${broadEntityType(source.entityType)}`;
+  const reverse = RELATIONSHIP_OPTIONS[reverseKey];
+  if (!options && reverse) options = reverse;
+
+  const base = options || [['knows', 'Knows']];
+  const sourceType = broadEntityType(source.entityType);
+  const targetType = broadEntityType(target.entityType);
+  const custom = currentCustomRelationshipTypes
+    .filter(item => item.source_type === sourceType && item.target_type === targetType)
+    .map(item => [item.key, item.label]);
+  return base.concat(custom);
+}
+
+function relationshipNeedsContext(type) {
+  return RELATIONSHIP_CONTEXT_TYPES.has(type) || type.startsWith('custom_');
+}
+
+function customRelationshipType(label) {
+  const slug = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/^([^a-z])/, 'x_$1')
+    .slice(0, 56);
+  return slug ? `custom_${slug}` : '';
+}
+
+function customRelationshipLabel(type) {
+  const match = currentCustomRelationshipTypes.find(item => item.key === type);
+  return match ? match.label : '';
+}
+
+function configureLinkTypeOptions(source, target) {
+  const select = el('link-type-select');
+  clearChildren(select);
+  relationshipOptionsFor(source, target).forEach(([value, label]) => {
+    const option = createEl('option', '');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  const custom = createEl('option', '');
+  custom.value = '__custom__';
+  custom.textContent = 'Custom...';
+  select.appendChild(custom);
+  updateLinkContextFields();
+}
+
+function updateLinkContextFields() {
+  const selected = el('link-type-select').value;
+  const custom = selected === '__custom__';
+  const contextual = custom || relationshipNeedsContext(selected);
+  el('link-custom-group').style.display = custom ? '' : 'none';
+  el('link-role-group').style.display = contextual ? '' : 'none';
+  el('link-dates-group').style.display = contextual ? '' : 'none';
+  el('link-current-group').style.display = contextual ? '' : 'none';
+}
+
 function initLinkModal() {
   el('link-modal-close').addEventListener('click', closeLinkModal);
   el('link-modal-cancel').addEventListener('click', closeLinkModal);
   el('link-modal-overlay').addEventListener('click', (e) => {
     if (e.target === el('link-modal-overlay')) closeLinkModal();
   });
+  el('link-type-select').addEventListener('change', updateLinkContextFields);
   el('link-modal-save').addEventListener('click', handleLinkSave);
 }
 
@@ -939,6 +1097,12 @@ function openLinkModal(sourceId, targetId) {
   preview.appendChild(arrow);
   preview.appendChild(nodeChip(target));
 
+  configureLinkTypeOptions(source, target);
+  el('link-custom-label').value = '';
+  el('link-role').value = '';
+  el('link-start').value = '';
+  el('link-end').value = '';
+  el('link-current').checked = false;
   el('link-notes').value = '';
   el('link-modal-overlay').classList.remove('modal-hidden');
   el('link-type-select').focus();
@@ -947,8 +1111,27 @@ function openLinkModal(sourceId, targetId) {
 }
 
 async function handleLinkSave() {
-  const type = el('link-type-select').value;
-  const notes = el('link-notes').value.trim();
+  let type = el('link-type-select').value;
+  const customLabel = el('link-custom-label').value.trim();
+  let resolvedCustomLabel = customRelationshipLabel(type);
+  if (type === '__custom__') {
+    type = customRelationshipType(customLabel);
+    if (!type) {
+      el('link-custom-label').focus();
+      el('link-custom-label').style.borderColor = 'var(--error)';
+      setTimeout(() => { el('link-custom-label').style.borderColor = ''; }, 1200);
+      return;
+    }
+    resolvedCustomLabel = customLabel;
+  }
+  const data = {
+    custom_label: resolvedCustomLabel || '',
+    role: el('link-role').value.trim(),
+    start_date: el('link-start').value.trim(),
+    end_date: el('link-end').value.trim(),
+    current: el('link-current').checked,
+    notes: el('link-notes').value.trim(),
+  };
   const source = graph.getNode(linkSourceNodeId);
   const target = graph.getNode(linkTargetNodeId);
   if (!source || !target) return;
@@ -957,18 +1140,30 @@ async function handleLinkSave() {
   try {
     let rel;
     if (isTemporaryGraphMode()) {
-      rel = createTemporaryRelationship(source, target, type, notes);
+      rel = createTemporaryRelationship(source, target, type, data);
     } else {
       try {
+        if (type.startsWith('custom_') && resolvedCustomLabel && window.currentNetworkId) {
+          const storedType = await apiCreateCustomRelationshipType(window.currentNetworkId, {
+            key: type,
+            label: resolvedCustomLabel,
+            source_type: broadEntityType(source.entityType),
+            target_type: broadEntityType(target.entityType),
+            direction_behavior: 'directed',
+          });
+          currentCustomRelationshipTypes = currentCustomRelationshipTypes
+            .filter(item => !(item.key === storedType.key && item.source_type === storedType.source_type && item.target_type === storedType.target_type))
+            .concat(storedType);
+        }
         rel = await apiCreateRelationship(
           source.id, source.entityType,
           target.id, target.entityType,
-          type, notes
+          type, data
         );
       } catch (err) {
         if (!isTemporaryApiError(err)) throw err;
         localOnlyWarning('Relationship creation', err);
-        rel = createTemporaryRelationship(source, target, type, notes);
+        rel = createTemporaryRelationship(source, target, type, data);
       }
     }
     graph.addLink({
@@ -978,6 +1173,11 @@ async function handleLinkSave() {
       sourceType: source.entityType,
       targetType: target.entityType,
       type: rel.type,
+      customLabel: rel.custom_label,
+      role: rel.role,
+      startDate: rel.start_date,
+      endDate: rel.end_date,
+      current: rel.current,
       notes: rel.notes,
     });
     closeLinkModal();
@@ -1081,20 +1281,21 @@ function initKeyboard() {
       e.preventDefault();
       const nodeId = graph.selectedNodeId;
       const node = graph.getNode(nodeId);
-      if (!confirm(`Delete "${node ? node.label : '?'}"?`)) return;
+      const action = destructiveActionLabel(node ? node.entityType : '');
+      if (!confirm(`${action} "${node ? node.label : '?'}"?`)) return;
       const deletePromise = isTemporaryGraphMode()
         ? Promise.resolve()
         : apiDelete(node.entityType, nodeId).catch(err => {
           if (!isTemporaryApiError(err)) throw err;
-          localOnlyWarning('Node delete', err);
+          localOnlyWarning(`Node ${action.toLowerCase()}`, err);
         });
 
       deletePromise.then(() => {
         removeNodeEl(nodeId);
         graph.removeNode(nodeId);
       }).catch(err => {
-        console.error('Delete failed:', err);
-        alert('Could not delete.');
+        console.error(`${action} failed:`, err);
+        alert(`Could not ${action.toLowerCase()}.`);
       });
     }
 

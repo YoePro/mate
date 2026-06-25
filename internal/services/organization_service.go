@@ -58,7 +58,7 @@ func (s *OrganizationService) Update(ctx context.Context, id string, organizatio
 	return s.store.UpdateOrganization(ctx, organization)
 }
 
-// Delete deletes an organization.
+// Delete archives an organization.
 func (s *OrganizationService) Delete(ctx context.Context, id string) error {
 	return s.store.DeleteOrganization(ctx, id)
 }

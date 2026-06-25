@@ -35,11 +35,13 @@ type NetworkPerson struct {
 
 // NetworkGraphResponse contains graph data scoped to one network.
 type NetworkGraphResponse struct {
-	Network       Network         `json:"network"`
-	Persons       []NetworkPerson `json:"persons"`
-	Organizations []Organization  `json:"organizations"`
-	Relationships []Relationship  `json:"relationships"`
-	Positions     []Position      `json:"positions"`
+	Network                 Network                  `json:"network"`
+	Persons                 []NetworkPerson          `json:"persons"`
+	Organizations           []Organization           `json:"organizations"`
+	Projects                []Project                `json:"projects"`
+	Relationships           []Relationship           `json:"relationships"`
+	Positions               []Position               `json:"positions"`
+	CustomRelationshipTypes []CustomRelationshipType `json:"custom_relationship_types,omitempty"`
 }
 
 // PersonMatchRequest describes person duplicate search input.

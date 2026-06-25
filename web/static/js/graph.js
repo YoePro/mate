@@ -3,7 +3,9 @@
 const graph = (() => {
   const nodes = [];
   const links = [];
+  const hiddenNodeIds = new Set();
   let selectedNodeId = null;
+  const selectedNodeIds = new Set();
   let linkSourceId = null;
 
   const listeners = {};
@@ -32,6 +34,8 @@ const graph = (() => {
       if (li !== -1) links.splice(li, 1);
     });
     if (selectedNodeId === id) selectedNodeId = null;
+    selectedNodeIds.delete(id);
+    hiddenNodeIds.delete(id);
     if (linkSourceId === id) linkSourceId = null;
     emit('nodes-changed', nodes);
     emit('links-changed', links);
@@ -65,8 +69,34 @@ const graph = (() => {
   }
 
   function selectNode(id) {
-    selectedNodeId = id;
+    selectedNodeIds.clear();
+    if (id) selectedNodeIds.add(id);
+    selectedNodeId = id || null;
     emit('selection-changed', id);
+  }
+
+  function toggleNodeSelection(id) {
+    if (!id) return;
+    if (selectedNodeIds.has(id)) {
+      selectedNodeIds.delete(id);
+    } else {
+      selectedNodeIds.add(id);
+    }
+    selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
+    emit('selection-changed', selectedNodeId);
+  }
+
+  function selectNodes(ids) {
+    selectedNodeIds.clear();
+    (ids || []).forEach(id => {
+      if (id) selectedNodeIds.add(id);
+    });
+    selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
+    emit('selection-changed', selectedNodeId);
+  }
+
+  function isNodeSelected(id) {
+    return selectedNodeIds.has(id);
   }
 
   function setLinkSource(id) {
@@ -81,8 +111,31 @@ const graph = (() => {
   function clear() {
     nodes.length = 0;
     links.length = 0;
+    hiddenNodeIds.clear();
     selectedNodeId = null;
+    selectedNodeIds.clear();
     linkSourceId = null;
+  }
+
+  function hideNodes(ids) {
+    (ids || []).forEach(id => {
+      if (id) hiddenNodeIds.add(id);
+      selectedNodeIds.delete(id);
+      if (selectedNodeId === id) selectedNodeId = null;
+    });
+    emit('selection-changed', selectedNodeId);
+    emit('nodes-changed', nodes);
+    emit('links-changed', links);
+  }
+
+  function showHiddenNodes() {
+    hiddenNodeIds.clear();
+    emit('nodes-changed', nodes);
+    emit('links-changed', links);
+  }
+
+  function isNodeHidden(id) {
+    return hiddenNodeIds.has(id);
   }
 
   function load(data) {
@@ -110,6 +163,11 @@ const graph = (() => {
       nodes.push({ id: o.id, entityType: o.type, label: o.name, x: pos.x, y: pos.y, data: o });
     });
 
+    (data.projects || []).forEach(p => {
+      const pos = posMap[`${p.id}:project`] || nextPos(idx++);
+      nodes.push({ id: p.id, entityType: 'project', label: p.name, x: pos.x, y: pos.y, data: p });
+    });
+
     (data.locations || []).forEach(l => {
       const pos = posMap[`${l.id}:location`] || nextPos(idx++);
       nodes.push({ id: l.id, entityType: 'location', label: l.name, x: pos.x, y: pos.y, data: l });
@@ -128,6 +186,11 @@ const graph = (() => {
         sourceType: r.source_type,
         targetType: r.target_type,
         type: r.type,
+        customLabel: r.custom_label,
+        role: r.role,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        current: r.current,
         notes: r.notes,
       });
     });
@@ -137,9 +200,11 @@ const graph = (() => {
     get nodes() { return nodes; },
     get links() { return links; },
     get selectedNodeId() { return selectedNodeId; },
+    get selectedNodeIds() { return Array.from(selectedNodeIds); },
+    get hiddenNodeIds() { return Array.from(hiddenNodeIds); },
     get linkSourceId() { return linkSourceId; },
     on, addNode, removeNode, updateNodePosition, updateNodeData,
-    addLink, removeLink, selectNode, setLinkSource,
-    getNode, getLink, getNodeLinks, load, clear,
+    addLink, removeLink, selectNode, toggleNodeSelection, selectNodes, isNodeSelected, setLinkSource,
+    getNode, getLink, getNodeLinks, hideNodes, showHiddenNodes, isNodeHidden, load, clear,
   };
 })();

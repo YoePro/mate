@@ -54,6 +54,9 @@ func (s *Storage) EnsureSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT mate_person_attribute_id IF NOT EXISTS FOR (a:PersonAttribute) REQUIRE a.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_organization_id IF NOT EXISTS FOR (o:Organization) REQUIRE o.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_organization_attribute_id IF NOT EXISTS FOR (a:OrganizationAttribute) REQUIRE a.id IS UNIQUE",
+		"CREATE CONSTRAINT mate_project_id IF NOT EXISTS FOR (p:Project) REQUIRE p.id IS UNIQUE",
+		"CREATE CONSTRAINT mate_custom_relationship_type_id IF NOT EXISTS FOR (t:CustomRelationshipType) REQUIRE t.id IS UNIQUE",
+		"CREATE CONSTRAINT mate_custom_relationship_type_key IF NOT EXISTS FOR (t:CustomRelationshipType) REQUIRE (t.network_id, t.key, t.source_type, t.target_type) IS UNIQUE",
 		"CREATE CONSTRAINT mate_position_key IF NOT EXISTS FOR (p:Position) REQUIRE (p.node_id, p.node_type) IS UNIQUE",
 		"CREATE CONSTRAINT mate_network_id IF NOT EXISTS FOR (n:Network) REQUIRE n.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_network_position_key IF NOT EXISTS FOR (p:NetworkPosition) REQUIRE (p.network_id, p.node_id, p.node_type) IS UNIQUE",
@@ -616,17 +619,103 @@ func (s *Storage) GetNetworkGraph(ctx context.Context, networkID string) (*model
 	if err != nil {
 		return nil, err
 	}
+	projects, err := s.listNetworkProjects(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
 	positions, err := s.listNetworkPositions(ctx, networkID)
 	if err != nil {
 		return nil, err
 	}
+	customRelationshipTypes, err := s.ListCustomRelationshipTypes(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
 	return &models.NetworkGraphResponse{
-		Network:       *network,
-		Persons:       persons,
-		Organizations: organizations,
-		Relationships: relationships,
-		Positions:     positions,
+		Network:                 *network,
+		Persons:                 persons,
+		Organizations:           organizations,
+		Projects:                projects,
+		Relationships:           relationships,
+		Positions:               positions,
+		CustomRelationshipTypes: customRelationshipTypes,
 	}, nil
+}
+
+// CreateCustomRelationshipType creates or updates a custom relationship type scoped to a network.
+func (s *Storage) CreateCustomRelationshipType(ctx context.Context, relationshipType models.CustomRelationshipType) (*models.CustomRelationshipType, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (n:Network {id: $network_id})
+			MERGE (n)-[:HAS_CUSTOM_RELATIONSHIP_TYPE]->(t:CustomRelationshipType {
+				network_id: $network_id,
+				key: $key,
+				source_type: $source_type,
+				target_type: $target_type
+			})
+			ON CREATE SET t.id = $id,
+			              t.owner_id = $owner_id
+			SET t.label = $label,
+			    t.direction_behavior = $direction_behavior,
+			    t.archived = false
+			RETURN t.id AS id,
+			       t.network_id AS network_id,
+			       t.owner_id AS owner_id,
+			       t.key AS key,
+			       t.label AS label,
+			       t.source_type AS source_type,
+			       t.target_type AS target_type,
+			       t.direction_behavior AS direction_behavior,
+			       t.archived AS archived`,
+			customRelationshipTypeParams(relationshipType),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		created := customRelationshipTypeFromRecord(record)
+		return &created, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.CustomRelationshipType), nil
+}
+
+// ListCustomRelationshipTypes lists custom relationship types for a network.
+func (s *Storage) ListCustomRelationshipTypes(ctx context.Context, networkID string) ([]models.CustomRelationshipType, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[:HAS_CUSTOM_RELATIONSHIP_TYPE]->(t:CustomRelationshipType)
+			WHERE coalesce(t.archived, false) = false
+			RETURN t.id AS id,
+			       t.network_id AS network_id,
+			       t.owner_id AS owner_id,
+			       t.key AS key,
+			       t.label AS label,
+			       t.source_type AS source_type,
+			       t.target_type AS target_type,
+			       t.direction_behavior AS direction_behavior,
+			       t.archived AS archived
+			ORDER BY toLower(t.label)`,
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		relationshipTypes := make([]models.CustomRelationshipType, 0)
+		for result.Next(ctx) {
+			relationshipTypes = append(relationshipTypes, customRelationshipTypeFromRecord(result.Record()))
+		}
+		return relationshipTypes, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.CustomRelationshipType), nil
 }
 
 // ListPersonNetworkIDs lists active network memberships for a person.
@@ -972,7 +1061,8 @@ func (s *Storage) CreateOrganization(ctx context.Context, organization models.Or
 				tags: $tags,
 				aliases: $aliases,
 				active: $active,
-				web: $web
+				web: $web,
+				archived: false
 			})`,
 			organizationParams(organization),
 		)
@@ -1007,7 +1097,7 @@ func (s *Storage) GetOrganization(ctx context.Context, id string) (*models.Organ
 // ListOrganizations returns all organizations.
 func (s *Storage) ListOrganizations(ctx context.Context) ([]models.Organization, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
-		result, err := tx.Run(ctx, organizationReturnQuery("MATCH (o:Organization)")+" ORDER BY toLower(o.name)", nil)
+		result, err := tx.Run(ctx, organizationReturnQuery("MATCH (o:Organization) WHERE coalesce(o.archived, false) = false")+" ORDER BY toLower(o.name)", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1056,7 +1146,108 @@ func (s *Storage) UpdateOrganization(ctx context.Context, organization models.Or
 
 // DeleteOrganization deletes an organization node and its relationships.
 func (s *Storage) DeleteOrganization(ctx context.Context, id string) error {
-	return s.deleteNode(ctx, "Organization", id)
+	return s.archiveNode(ctx, "Organization", id)
+}
+
+// CreateProject creates a project node.
+func (s *Storage) CreateProject(ctx context.Context, project models.Project) (*models.Project, error) {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		_, err := tx.Run(ctx, `
+			CREATE (p:Project {
+				id: $id,
+				name: $name,
+				status: $status,
+				description: $description,
+				notes: $notes,
+				tags: $tags,
+				aliases: $aliases,
+				active: $active,
+				web: $web,
+				archived: false
+			})`,
+			projectParams(project),
+		)
+		return nil, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+// GetProject returns one project by ID.
+func (s *Storage) GetProject(ctx context.Context, id string) (*models.Project, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, projectReturnQuery("MATCH (p:Project {id: $id})"), map[string]any{"id": id})
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		project := projectFromRecord(record)
+		return &project, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Project), nil
+}
+
+// ListProjects returns all projects.
+func (s *Storage) ListProjects(ctx context.Context) ([]models.Project, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, projectReturnQuery("MATCH (p:Project) WHERE coalesce(p.archived, false) = false")+" ORDER BY toLower(p.name)", nil)
+		if err != nil {
+			return nil, err
+		}
+		var projects []models.Project
+		for result.Next(ctx) {
+			projects = append(projects, projectFromRecord(result.Record()))
+		}
+		return projects, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Project), nil
+}
+
+// UpdateProject updates a project node.
+func (s *Storage) UpdateProject(ctx context.Context, project models.Project) (*models.Project, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, projectReturnQuery(`
+			MATCH (p:Project {id: $id})
+			SET p.name = $name,
+			    p.status = $status,
+			    p.description = $description,
+			    p.notes = $notes,
+			    p.tags = $tags,
+			    p.aliases = $aliases,
+			    p.active = $active,
+			    p.web = $web`),
+			projectParams(project),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		updated := projectFromRecord(record)
+		return &updated, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Project), nil
+}
+
+// DeleteProject deletes a project node and its relationships.
+func (s *Storage) DeleteProject(ctx context.Context, id string) error {
+	return s.archiveNode(ctx, "Project", id)
 }
 
 // GetOrganizationProfile returns an organization with attributes and relationships.
@@ -1215,14 +1406,24 @@ func (s *Storage) CreateRelationship(ctx context.Context, relationship models.Re
 			id: $id,
 			source_type: $source_type,
 			target_type: $target_type,
+			custom_label: $custom_label,
+			role: $role,
+			start_date: $start_date,
+			end_date: $end_date,
+			current: $current,
 			notes: $notes
 		}]->(target)
 		RETURN r.id AS id,
 		       type(r) AS type,
 		       source.id AS source_id,
-		       coalesce(source.type, 'person') AS source_type,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
 		       target.id AS target_id,
-		       coalesce(target.type, 'person') AS target_type,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       r.custom_label AS custom_label,
+		       r.role AS role,
+		       r.start_date AS start_date,
+		       r.end_date AS end_date,
+		       r.current AS current,
 		       r.notes AS notes`, relType)
 	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, query, relationshipParams(relationship))
@@ -1353,6 +1554,10 @@ func (s *Storage) GetGraph(ctx context.Context) (*models.GraphResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	projects, err := s.ListProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
 	relationships, err := s.ListRelationships(ctx)
 	if err != nil {
 		return nil, err
@@ -1365,6 +1570,7 @@ func (s *Storage) GetGraph(ctx context.Context) (*models.GraphResponse, error) {
 	return &models.GraphResponse{
 		Persons:       persons,
 		Organizations: organizations,
+		Projects:      projects,
 		Locations:     []map[string]any{},
 		Tags:          []map[string]any{},
 		Relationships: relationships,
@@ -1438,6 +1644,7 @@ func (s *Storage) listNetworkOrganizations(ctx context.Context, networkID string
 			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
 			MATCH (person)-[r]-(o:Organization)
 			WHERE coalesce(membership.archived, false) = false
+			  AND coalesce(o.archived, false) = false
 			  AND r.id IS NOT NULL`)+" ORDER BY toLower(o.name)",
 			map[string]any{"network_id": networkID},
 		)
@@ -1460,6 +1667,37 @@ func (s *Storage) listNetworkOrganizations(ctx context.Context, networkID string
 		return nil, err
 	}
 	return value.([]models.Organization), nil
+}
+
+func (s *Storage) listNetworkProjects(ctx context.Context, networkID string) ([]models.Project, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, projectReturnQuery(`
+			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			MATCH (person)-[r]-(p:Project)
+			WHERE coalesce(membership.archived, false) = false
+			  AND coalesce(p.archived, false) = false
+			  AND r.id IS NOT NULL`)+" ORDER BY toLower(p.name)",
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		projects := make([]models.Project, 0)
+		for result.Next(ctx) {
+			project := projectFromRecord(result.Record())
+			if seen[project.ID] {
+				continue
+			}
+			seen[project.ID] = true
+			projects = append(projects, project)
+		}
+		return projects, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.Project), nil
 }
 
 func (s *Storage) listNetworkPositions(ctx context.Context, networkID string) ([]models.Position, error) {
@@ -1588,6 +1826,30 @@ func (s *Storage) deleteNode(ctx context.Context, label, id string) error {
 	return err
 }
 
+func (s *Storage) archiveNode(ctx context.Context, label, id string) error {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, fmt.Sprintf(`
+			MATCH (n:%s {id: $id})
+			SET n.archived = true,
+			    n.active = false
+			RETURN count(n) AS archived`, label),
+			map[string]any{"id": id},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if asInt(record, "archived") == 0 {
+			return nil, storage.ErrNotFound
+		}
+		return nil, nil
+	})
+	return err
+}
+
 func (s *Storage) read(ctx context.Context, work func(driver.ManagedTransaction) (any, error)) (any, error) {
 	session := s.driver.NewSession(ctx, driver.SessionConfig{DatabaseName: s.database})
 	defer session.Close(ctx)
@@ -1665,18 +1927,53 @@ func organizationParams(organization models.Organization) map[string]any {
 		"aliases":     organization.Aliases,
 		"active":      organization.Active,
 		"web":         organization.Web,
+		"archived":    organization.Archived,
+	}
+}
+
+func projectParams(project models.Project) map[string]any {
+	return map[string]any{
+		"id":          project.ID,
+		"name":        project.Name,
+		"status":      project.Status,
+		"description": project.Description,
+		"notes":       project.Notes,
+		"tags":        project.Tags,
+		"aliases":     project.Aliases,
+		"active":      project.Active,
+		"web":         project.Web,
+		"archived":    project.Archived,
+	}
+}
+
+func customRelationshipTypeParams(relationshipType models.CustomRelationshipType) map[string]any {
+	return map[string]any{
+		"id":                 relationshipType.ID,
+		"network_id":         relationshipType.NetworkID,
+		"owner_id":           relationshipType.OwnerID,
+		"key":                relationshipType.Key,
+		"label":              relationshipType.Label,
+		"source_type":        relationshipType.SourceType,
+		"target_type":        relationshipType.TargetType,
+		"direction_behavior": relationshipType.DirectionBehavior,
+		"archived":           relationshipType.Archived,
 	}
 }
 
 func relationshipParams(relationship models.Relationship) map[string]any {
 	return map[string]any{
-		"id":          relationship.ID,
-		"source_id":   relationship.SourceID,
-		"source_type": relationship.SourceType,
-		"target_id":   relationship.TargetID,
-		"target_type": relationship.TargetType,
-		"type":        string(relationship.Type),
-		"notes":       relationship.Notes,
+		"id":           relationship.ID,
+		"source_id":    relationship.SourceID,
+		"source_type":  relationship.SourceType,
+		"target_id":    relationship.TargetID,
+		"target_type":  relationship.TargetType,
+		"type":         string(relationship.Type),
+		"custom_label": relationship.CustomLabel,
+		"role":         relationship.Role,
+		"start_date":   relationship.StartDate,
+		"end_date":     relationship.EndDate,
+		"current":      relationship.Current,
+		"notes":        relationship.Notes,
 	}
 }
 
@@ -1780,18 +2077,53 @@ func organizationFromRecord(record *driver.Record) models.Organization {
 		Aliases:     asStringSlice(record, "aliases"),
 		Active:      asBool(record, "active"),
 		Web:         asString(record, "web"),
+		Archived:    asBool(record, "archived"),
+	}
+}
+
+func projectFromRecord(record *driver.Record) models.Project {
+	return models.Project{
+		ID:          asString(record, "id"),
+		Name:        asString(record, "name"),
+		Status:      asString(record, "status"),
+		Description: asString(record, "description"),
+		Notes:       asString(record, "notes"),
+		Tags:        asStringSlice(record, "tags"),
+		Aliases:     asStringSlice(record, "aliases"),
+		Active:      asBool(record, "active"),
+		Web:         asString(record, "web"),
+		Archived:    asBool(record, "archived"),
+	}
+}
+
+func customRelationshipTypeFromRecord(record *driver.Record) models.CustomRelationshipType {
+	return models.CustomRelationshipType{
+		ID:                asString(record, "id"),
+		NetworkID:         asString(record, "network_id"),
+		OwnerID:           asString(record, "owner_id"),
+		Key:               asString(record, "key"),
+		Label:             asString(record, "label"),
+		SourceType:        asString(record, "source_type"),
+		TargetType:        asString(record, "target_type"),
+		DirectionBehavior: asString(record, "direction_behavior"),
+		Archived:          asBool(record, "archived"),
 	}
 }
 
 func relationshipFromRecord(record *driver.Record) models.Relationship {
 	return models.Relationship{
-		ID:         asString(record, "id"),
-		SourceID:   asString(record, "source_id"),
-		SourceType: asString(record, "source_type"),
-		TargetID:   asString(record, "target_id"),
-		TargetType: asString(record, "target_type"),
-		Type:       models.RelationshipType(asString(record, "type")),
-		Notes:      asString(record, "notes"),
+		ID:          asString(record, "id"),
+		SourceID:    asString(record, "source_id"),
+		SourceType:  asString(record, "source_type"),
+		TargetID:    asString(record, "target_id"),
+		TargetType:  asString(record, "target_type"),
+		Type:        models.RelationshipType(asString(record, "type")),
+		CustomLabel: asString(record, "custom_label"),
+		Role:        asString(record, "role"),
+		StartDate:   asString(record, "start_date"),
+		EndDate:     asString(record, "end_date"),
+		Current:     asBool(record, "current"),
+		Notes:       asString(record, "notes"),
 	}
 }
 
@@ -1858,7 +2190,14 @@ func organizationReturnQuery(prefix string) string {
 	return prefix + `
 		RETURN o.id AS id, o.name AS name, o.type AS type, o.description AS description,
 		       o.notes AS notes, o.tags AS tags, o.aliases AS aliases, o.active AS active,
-		       o.web AS web`
+		       o.web AS web, o.archived AS archived`
+}
+
+func projectReturnQuery(prefix string) string {
+	return prefix + `
+		RETURN p.id AS id, p.name AS name, p.status AS status, p.description AS description,
+		       p.notes AS notes, p.tags AS tags, p.aliases AS aliases, p.active AS active,
+		       p.web AS web, p.archived AS archived`
 }
 
 func relationshipReturnQuery(prefix string) string {
@@ -1866,9 +2205,14 @@ func relationshipReturnQuery(prefix string) string {
 		RETURN r.id AS id,
 		       type(r) AS type,
 		       source.id AS source_id,
-		       coalesce(source.type, 'person') AS source_type,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
 		       target.id AS target_id,
-		       coalesce(target.type, 'person') AS target_type,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       r.custom_label AS custom_label,
+		       r.role AS role,
+		       r.start_date AS start_date,
+		       r.end_date AS end_date,
+		       r.current AS current,
 		       r.notes AS notes`
 }
 

@@ -257,8 +257,10 @@ Response:
     }
   ],
   "organizations": [],
+  "projects": [],
   "relationships": [],
-  "positions": []
+  "positions": [],
+  "custom_relationship_types": []
 }
 ```
 
@@ -276,6 +278,45 @@ Request:
   "y": 180
 }
 ```
+
+### GET /api/v1/networks/{id}/relationship-types
+
+Returns custom relationship types owned by this network.
+
+Response:
+
+```json
+[
+  {
+    "id": "reltype-123",
+    "network_id": "network-123",
+    "owner_id": "acct-123",
+    "key": "custom_hates",
+    "label": "hates",
+    "source_type": "person",
+    "target_type": "person",
+    "direction_behavior": "directed"
+  }
+]
+```
+
+### POST /api/v1/networks/{id}/relationship-types
+
+Creates or updates a reusable custom relationship type scoped to the owned network. Non-owners cannot create relationship type metadata for another user's network.
+
+Request:
+
+```json
+{
+  "key": "custom_hates",
+  "label": "hates",
+  "source_type": "person",
+  "target_type": "person",
+  "direction_behavior": "directed"
+}
+```
+
+`key` must start with `custom_` and contain only lowercase ASCII letters, digits, and underscores after that prefix.
 
 ### GET /api/v1/networks/{id}/persons
 
@@ -499,7 +540,7 @@ Request:
 }
 ```
 
-Supported organization types are `company`, `association`, and `school`.
+Supported organization types are `company`, `association`, `school`, `government`, `political_party`, `religious_organization`, `sports_club`, `military_unit`, `ngo`, and `community`.
 
 ### PUT /api/v1/organizations/{id}
 
@@ -507,7 +548,7 @@ Updates an organization.
 
 ### DELETE /api/v1/organizations/{id}
 
-Deletes an organization.
+Archives an organization. Archived organizations are hidden from graph/list responses.
 
 ### GET /api/v1/organizations/{id}/profile
 
@@ -547,9 +588,51 @@ Archives an organization profile attribute.
 
 ---
 
+## Projects
+
+Project is a first-class top-level entity for initiatives that people can work on and organizations can sponsor.
+
+### GET /api/v1/projects
+
+Returns all active projects.
+
+### GET /api/v1/projects/{id}
+
+Returns a specific project.
+
+### POST /api/v1/projects
+
+Creates a new project.
+
+Request:
+
+```json
+{
+  "name": "MATE",
+  "status": "active",
+  "description": "Relationship mapping project",
+  "web": "https://example.com",
+  "notes": "Optional notes"
+}
+```
+
+### PUT /api/v1/projects/{id}
+
+Updates a project.
+
+### DELETE /api/v1/projects/{id}
+
+Archives a project. Archived projects are hidden from graph/list responses.
+
+---
+
 ## Relationships
 
-Supported relationship types are `knows`, `spouse_of`, `parent_of`, `sibling_of`, `works_at`, `member_of`, `studied_at`, `lives_in`, and `has_tag`.
+Supported built-in relationship types are `knows`, `spouse_of`, `parent_of`, `sibling_of`, `works_at`, `member_of`, `studied_at`, `lives_in`, `has_tag`, `works_on`, `sponsors`, `partner_of`, and `owns`.
+
+Custom relationship types are supported when the type key matches `custom_*` validation and the relationship includes `custom_label`. The frontend stores reusable custom relationship type metadata through the network relationship-type endpoints before creating the relationship.
+
+Relationship type choices in the frontend are filtered by broad source/target entity type, such as person-to-person, person-to-organization, organization-to-organization, person-to-project, and organization-to-project.
 
 ### GET /api/v1/relationships
 
@@ -568,6 +651,10 @@ Request:
   "target_id": "org-456",
   "target_type": "company",
   "type": "works_at",
+  "role": "Developer",
+  "start_date": "2024",
+  "end_date": "",
+  "current": true,
   "notes": "Current role"
 }
 ```
@@ -594,6 +681,7 @@ Response:
 {
   "persons": [],
   "organizations": [],
+  "projects": [],
   "locations": [],
   "tags": [],
   "relationships": [],

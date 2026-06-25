@@ -138,6 +138,8 @@ func (api *API) networkNested(w http.ResponseWriter, r *http.Request, actor *mod
 		api.networkGraph(w, r, actor, networkID)
 	case "positions":
 		api.networkPositions(w, r, actor, networkID)
+	case "relationship-types":
+		api.networkRelationshipTypes(w, r, actor, networkID)
 	case "persons":
 		api.networkPersons(w, r, actor, networkID, parts[1:])
 	default:
@@ -177,6 +179,36 @@ func (api *API) networkPositions(w http.ResponseWriter, r *http.Request, actor *
 		return
 	}
 	writeJSON(w, http.StatusNoContent, nil)
+}
+
+func (api *API) networkRelationshipTypes(w http.ResponseWriter, r *http.Request, actor *models.Account, networkID string) {
+	switch r.Method {
+	case http.MethodGet:
+		relationshipTypes, err := api.services.Networks.ListCustomRelationshipTypes(r.Context(), actor, networkID)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, relationshipTypes)
+	case http.MethodPost:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		var relationshipType models.CustomRelationshipType
+		if err := decodeJSON(r, &relationshipType); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		created, err := api.services.Networks.CreateCustomRelationshipType(r.Context(), actor, networkID, relationshipType)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, created)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func (api *API) networkPersons(w http.ResponseWriter, r *http.Request, actor *models.Account, networkID string, parts []string) {

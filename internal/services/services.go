@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"regexp"
 	"strings"
 
 	"mate/internal/models"
@@ -14,6 +15,7 @@ import (
 type Services struct {
 	Persons       *PersonService
 	Organizations *OrganizationService
+	Projects      *ProjectService
 	Relationships *RelationshipService
 	Graph         *GraphService
 	Accounts      *AccountService
@@ -25,6 +27,7 @@ func New(store storage.Storage) *Services {
 	return &Services{
 		Persons:       &PersonService{store: store},
 		Organizations: &OrganizationService{store: store},
+		Projects:      &ProjectService{store: store},
 		Relationships: &RelationshipService{store: store},
 		Graph:         &GraphService{store: store},
 		Accounts:      &AccountService{store: store},
@@ -59,7 +62,16 @@ func normalizeSpace(value string) string {
 
 func validOrganizationType(value models.OrganizationType) bool {
 	switch value {
-	case models.OrganizationCompany, models.OrganizationAssociation, models.OrganizationSchool:
+	case models.OrganizationCompany,
+		models.OrganizationAssociation,
+		models.OrganizationSchool,
+		models.OrganizationGovernment,
+		models.OrganizationPoliticalParty,
+		models.OrganizationReligiousOrganization,
+		models.OrganizationSportsClub,
+		models.OrganizationMilitaryUnit,
+		models.OrganizationNGO,
+		models.OrganizationCommunity:
 		return true
 	default:
 		return false
@@ -76,7 +88,26 @@ func validRelationshipType(value models.RelationshipType) bool {
 		models.RelationshipMemberOf,
 		models.RelationshipStudiedAt,
 		models.RelationshipLivesIn,
-		models.RelationshipHasTag:
+		models.RelationshipHasTag,
+		models.RelationshipWorksOn,
+		models.RelationshipSponsors,
+		models.RelationshipPartnerOf,
+		models.RelationshipOwns:
+		return true
+	default:
+		return validCustomRelationshipType(string(value))
+	}
+}
+
+var customRelationshipTypePattern = regexp.MustCompile(`^custom_[a-z][a-z0-9_]{0,63}$`)
+
+func validCustomRelationshipType(value string) bool {
+	return customRelationshipTypePattern.MatchString(value)
+}
+
+func validCustomRelationshipDirection(value string) bool {
+	switch value {
+	case "directed", "undirected":
 		return true
 	default:
 		return false
