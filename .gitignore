@@ -18,6 +18,7 @@ bin/
 # Local configuration and credentials
 .mate.ini
 mate.ini
+mate
 
 # Neo4j local data and logs
 neo4j/data/
