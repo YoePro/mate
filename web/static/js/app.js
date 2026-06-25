@@ -119,7 +119,9 @@ async function loadGraph() {
 async function initNetworks() {
   const select = el('network-select');
   const createBtn = el('btn-new-network');
+  const renameBtn = el('btn-rename-network');
   createBtn.addEventListener('click', handleCreateNetwork);
+  renameBtn.addEventListener('click', handleRenameNetwork);
   select.addEventListener('change', async () => {
     const selected = ownedNetworks.find(n => n.id === select.value);
     setCurrentNetwork(selected || null);
@@ -139,6 +141,14 @@ async function refreshNetworks() {
   const selected = ownedNetworks.find(n => n.id === savedID) || ownedNetworks[0] || null;
   renderNetworkOptions(ownedNetworks, selected ? selected.id : '');
   setCurrentNetwork(selected);
+}
+
+function updateNetworkActions() {
+  const createBtn = el('btn-new-network');
+  const renameBtn = el('btn-rename-network');
+  const canWrite = currentAccount && currentAccount.role !== 'viewer';
+  if (createBtn) createBtn.disabled = !canWrite;
+  if (renameBtn) renameBtn.disabled = !canWrite || !currentNetwork;
 }
 
 function renderNetworkOptions(networks, selectedID) {
@@ -170,9 +180,11 @@ function setCurrentNetwork(network) {
   } else {
     window.localStorage.removeItem('mate.currentNetworkId');
   }
+  updateNetworkActions();
 }
 
 async function handleCreateNetwork() {
+  if (currentAccount && currentAccount.role === 'viewer') return;
   const name = prompt('Network name');
   if (!name || !name.trim()) return;
   try {
@@ -185,6 +197,24 @@ async function handleCreateNetwork() {
   } catch (err) {
     console.error('Network create failed:', err);
     alert('Could not create network.');
+  }
+}
+
+async function handleRenameNetwork() {
+  if (!currentNetwork || (currentAccount && currentAccount.role === 'viewer')) return;
+  const name = prompt('Network name', currentNetwork.name || '');
+  if (!name || !name.trim() || name.trim() === currentNetwork.name) return;
+  try {
+    const updated = await apiUpdateNetwork(currentNetwork.id, {
+      name: name.trim(),
+      description: currentNetwork.description || '',
+    });
+    ownedNetworks = ownedNetworks.map(network => network.id === updated.id ? updated : network);
+    renderNetworkOptions(ownedNetworks, updated.id);
+    setCurrentNetwork(updated);
+  } catch (err) {
+    console.error('Network rename failed:', err);
+    alert('Could not rename network.');
   }
 }
 

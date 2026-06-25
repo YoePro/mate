@@ -135,6 +135,10 @@ async function apiCreateNetwork(data) {
   return apiFetch('/networks', { method: 'POST', body: JSON.stringify(data) });
 }
 
+async function apiUpdateNetwork(id, data) {
+  return apiFetch('/networks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+
 async function apiSearchNetworks(query) {
   return apiFetch('/networks/search?q=' + encodeURIComponent(query));
 }
