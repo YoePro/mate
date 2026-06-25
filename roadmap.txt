@@ -1136,6 +1136,10 @@ Implementation checklist:
 * Add service-level permission checks for every network-scoped write.
 * Ensure users only see their own network data unless sharing is explicitly enabled.
 * Ensure users who do not own a network cannot edit it.
+* Add UI function for renaming a network
+* Add backend for renaming a network
+* Add UI function for creating a new network
+* Add backend for creating a new network
 * Allow users to search discoverable networks without granting edit permissions.
 * Keep sharing model explicit but minimal in 0.9; full sharing UI can come later.
 * Update docs/api.md for networks and duplicate suggestions.
