@@ -254,6 +254,9 @@ func (s *NetworkService) requireOwner(ctx context.Context, actor *models.Account
 	if err != nil {
 		return err
 	}
+	if network.Archived {
+		return storage.ErrNotFound
+	}
 	if network.OwnerID != actor.ID {
 		return ErrForbidden
 	}
