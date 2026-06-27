@@ -97,6 +97,7 @@ async function apiSavePosition(nodeId, nodeType, x, y) {
 
 async function apiCreateRelationship(sourceId, sourceType, targetId, targetType, type, data) {
   const relationship = Object.assign({
+    network_id: window.currentNetworkId || '',
     source_id: sourceId,
     source_type: sourceType,
     target_id: targetId,

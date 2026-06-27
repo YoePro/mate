@@ -1404,6 +1404,7 @@ func (s *Storage) CreateRelationship(ctx context.Context, relationship models.Re
 		MATCH (target {id: $target_id})
 		CREATE (source)-[r:%s {
 			id: $id,
+			network_id: $network_id,
 			source_type: $source_type,
 			target_type: $target_type,
 			custom_label: $custom_label,
@@ -1414,6 +1415,7 @@ func (s *Storage) CreateRelationship(ctx context.Context, relationship models.Re
 			notes: $notes
 		}]->(target)
 		RETURN r.id AS id,
+		       r.network_id AS network_id,
 		       type(r) AS type,
 		       source.id AS source_id,
 		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
@@ -1609,12 +1611,24 @@ func (s *Storage) listPositions(ctx context.Context) ([]models.Position, error) 
 func (s *Storage) listNetworkRelationships(ctx context.Context, networkID string) ([]models.Relationship, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, relationshipReturnQuery(`
-			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
 			MATCH (source)-[r]->(target)
-			WHERE coalesce(membership.archived, false) = false
-			  AND r.id IS NOT NULL
-			  AND (source.id = person.id OR target.id = person.id)
-			  AND type(r) <> 'CONTAINS_PERSON'`),
+			WHERE r.id IS NOT NULL
+			  AND (
+			    r.network_id = $network_id
+			    OR EXISTS {
+			      MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			      WHERE coalesce(membership.archived, false) = false
+			        AND (source.id = person.id OR target.id = person.id)
+			    }
+			    OR (
+			      EXISTS {
+			        MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: source.id})
+			      }
+			      AND EXISTS {
+			        MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: target.id})
+			      }
+			    )
+			  )`),
 			map[string]any{"network_id": networkID},
 		)
 		if err != nil {
@@ -1641,11 +1655,34 @@ func (s *Storage) listNetworkRelationships(ctx context.Context, networkID string
 func (s *Storage) listNetworkOrganizations(ctx context.Context, networkID string) ([]models.Organization, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, organizationReturnQuery(`
-			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
-			MATCH (person)-[r]-(o:Organization)
-			WHERE coalesce(membership.archived, false) = false
-			  AND coalesce(o.archived, false) = false
-			  AND r.id IS NOT NULL`)+" ORDER BY toLower(o.name)",
+			MATCH (o:Organization)
+			WHERE coalesce(o.archived, false) = false
+			  AND (
+			    EXISTS {
+			      MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: o.id})
+			    }
+			    OR EXISTS {
+			      MATCH (source)-[r]->(target)
+			      WHERE r.id IS NOT NULL
+			        AND (source.id = o.id OR target.id = o.id)
+			        AND (
+			          r.network_id = $network_id
+			          OR EXISTS {
+			            MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			            WHERE coalesce(membership.archived, false) = false
+			              AND (source.id = person.id OR target.id = person.id)
+			          }
+			          OR (
+			            EXISTS {
+			              MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: source.id})
+			            }
+			            AND EXISTS {
+			              MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: target.id})
+			            }
+			          )
+			        )
+			    }
+			  )`)+" ORDER BY toLower(o.name)",
 			map[string]any{"network_id": networkID},
 		)
 		if err != nil {
@@ -1672,11 +1709,34 @@ func (s *Storage) listNetworkOrganizations(ctx context.Context, networkID string
 func (s *Storage) listNetworkProjects(ctx context.Context, networkID string) ([]models.Project, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, projectReturnQuery(`
-			MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
-			MATCH (person)-[r]-(p:Project)
-			WHERE coalesce(membership.archived, false) = false
-			  AND coalesce(p.archived, false) = false
-			  AND r.id IS NOT NULL`)+" ORDER BY toLower(p.name)",
+			MATCH (p:Project)
+			WHERE coalesce(p.archived, false) = false
+			  AND (
+			    EXISTS {
+			      MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: p.id})
+			    }
+			    OR EXISTS {
+			      MATCH (source)-[r]->(target)
+			      WHERE r.id IS NOT NULL
+			        AND (source.id = p.id OR target.id = p.id)
+			        AND (
+			          r.network_id = $network_id
+			          OR EXISTS {
+			            MATCH (:Network {id: $network_id})-[membership:CONTAINS_PERSON]->(person:Person)
+			            WHERE coalesce(membership.archived, false) = false
+			              AND (source.id = person.id OR target.id = person.id)
+			          }
+			          OR (
+			            EXISTS {
+			              MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: source.id})
+			            }
+			            AND EXISTS {
+			              MATCH (:Network {id: $network_id})-[:HAS_POSITION]->(:NetworkPosition {node_id: target.id})
+			            }
+			          )
+			        )
+			    }
+			  )`)+" ORDER BY toLower(p.name)",
 			map[string]any{"network_id": networkID},
 		)
 		if err != nil {
@@ -1963,6 +2023,7 @@ func customRelationshipTypeParams(relationshipType models.CustomRelationshipType
 func relationshipParams(relationship models.Relationship) map[string]any {
 	return map[string]any{
 		"id":           relationship.ID,
+		"network_id":   relationship.NetworkID,
 		"source_id":    relationship.SourceID,
 		"source_type":  relationship.SourceType,
 		"target_id":    relationship.TargetID,
@@ -2113,6 +2174,7 @@ func customRelationshipTypeFromRecord(record *driver.Record) models.CustomRelati
 func relationshipFromRecord(record *driver.Record) models.Relationship {
 	return models.Relationship{
 		ID:          asString(record, "id"),
+		NetworkID:   asString(record, "network_id"),
 		SourceID:    asString(record, "source_id"),
 		SourceType:  asString(record, "source_type"),
 		TargetID:    asString(record, "target_id"),
@@ -2203,6 +2265,7 @@ func projectReturnQuery(prefix string) string {
 func relationshipReturnQuery(prefix string) string {
 	return prefix + `
 		RETURN r.id AS id,
+		       r.network_id AS network_id,
 		       type(r) AS type,
 		       source.id AS source_id,
 		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,

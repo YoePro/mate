@@ -22,6 +22,7 @@ const (
 // Relationship represents a connection between two nodes.
 type Relationship struct {
 	ID          string           `json:"id"`
+	NetworkID   string           `json:"network_id,omitempty"`
 	SourceID    string           `json:"source_id"`
 	SourceType  string           `json:"source_type"`
 	TargetID    string           `json:"target_id"`

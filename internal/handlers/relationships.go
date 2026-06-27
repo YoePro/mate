@@ -26,10 +26,21 @@ func (api *API) Relationships(w http.ResponseWriter, r *http.Request) {
 			writeServiceError(w, err)
 			return
 		}
+		actor, err := api.currentAccount(r)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
 		var relationship models.Relationship
 		if err := decodeJSON(r, &relationship); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json")
 			return
+		}
+		if relationship.NetworkID != "" {
+			if _, err := api.services.Networks.Get(r.Context(), actor, relationship.NetworkID); err != nil {
+				writeServiceError(w, err)
+				return
+			}
 		}
 		created, err := api.services.Relationships.Create(r.Context(), relationship)
 		if err != nil {

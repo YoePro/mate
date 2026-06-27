@@ -50,8 +50,11 @@ Relationships can carry structured context:
 - `current`
 - `notes`
 - `custom_label` for custom relationship types
+- optional `network_id` for relationships created inside a selected network
 
 The frontend uses these fields for relationship contexts such as `works_at` with a role like "Developer" or "Chairman".
+
+Network-scoped relationship persistence is important for non-person links such as `Organization -> sponsors -> Project`, because those links cannot be inferred from a network's person memberships.
 
 Custom relationship type definitions are network-scoped. They store the reusable key and label plus broad source/target entity types and direction behavior. The current direction behavior values are `directed` and `undirected`; 0.11 stores the value but does not yet alter graph rendering based on it.
 

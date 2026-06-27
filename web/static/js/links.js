@@ -2,7 +2,7 @@
 
 const SVG_OFFSET = 4000;
 
-function getLinkPath(source, target) {
+function getLinkPath(source, target, offset = 0) {
   const sx = source.x + SVG_OFFSET;
   const sy = source.y + SVG_OFFSET;
   const tx = target.x + SVG_OFFSET;
@@ -11,13 +11,19 @@ function getLinkPath(source, target) {
   const dy = ty - sy;
   const cx = dx / 2;
   const cy = dy / 2;
-  return `M ${sx} ${sy} C ${sx + cx} ${sy}, ${tx - cx} ${ty}, ${tx} ${ty}`;
+  const length = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = (-dy / length) * offset;
+  const ny = (dx / length) * offset;
+  return `M ${sx} ${sy} C ${sx + cx + nx} ${sy + ny}, ${tx - cx + nx} ${ty + ny}, ${tx} ${ty}`;
 }
 
-function getLinkMidpoint(source, target) {
+function getLinkMidpoint(source, target, offset = 0) {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  const length = Math.sqrt(dx * dx + dy * dy) || 1;
   return {
-    x: (source.x + target.x) / 2 + SVG_OFFSET,
-    y: (source.y + target.y) / 2 + SVG_OFFSET,
+    x: (source.x + target.x) / 2 + SVG_OFFSET + (-dy / length) * offset,
+    y: (source.y + target.y) / 2 + SVG_OFFSET + (dx / length) * offset,
   };
 }
 
@@ -53,6 +59,19 @@ function renderAllLinks() {
   });
 }
 
+function linkPairKey(link) {
+  return [link.sourceId, link.targetId].sort().join(':');
+}
+
+function linkOffset(link) {
+  const pairLinks = graph.links
+    .filter(item => linkPairKey(item) === linkPairKey(link))
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  if (pairLinks.length <= 1) return 0;
+  const index = pairLinks.findIndex(item => item.id === link.id);
+  return (index - (pairLinks.length - 1) / 2) * 34;
+}
+
 function renderLink(link) {
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
@@ -60,15 +79,16 @@ function renderLink(link) {
   if (graph.isNodeHidden(source.id) || graph.isNodeHidden(target.id)) return;
 
   const layer = el('links-layer');
+  const offset = linkOffset(link);
 
   const path = svgEl('path', {
-    'd': getLinkPath(source, target),
+    'd': getLinkPath(source, target, offset),
     'class': 'graph-link',
     'data-link-id': link.id,
     'marker-end': 'url(#arrow)',
   });
 
-  const mid = getLinkMidpoint(source, target);
+  const mid = getLinkMidpoint(source, target, offset);
   const text = svgEl('text', {
     'x': String(mid.x),
     'y': String(mid.y - 8),

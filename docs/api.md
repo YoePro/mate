@@ -646,6 +646,7 @@ Request:
 
 ```json
 {
+  "network_id": "network-123",
   "source_id": "person-123",
   "source_type": "person",
   "target_id": "org-456",
@@ -658,6 +659,8 @@ Request:
   "notes": "Current role"
 }
 ```
+
+`network_id` is optional for legacy/global calls. When it is present, the current account must own that network and the relationship is returned by that network's graph even when neither endpoint is a person.
 
 ### GET /api/v1/relationships/{id}
 
