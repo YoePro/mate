@@ -29,3 +29,10 @@ MATE 0.7 includes persisted accounts and sessions. Open `/login` after starting 
 - The main app at `/` requires a valid session and redirects to `/login` otherwise.
 - The header shows the current account and provides `Sign out`.
 - Owner account management endpoints exist in the API; a full account-management UI is planned later.
+
+## Documentation
+
+- `docs/features.md` summarizes implemented features and current stabilization focus.
+- `docs/api.md` documents HTTP endpoints.
+- `docs/frontend-smoke-test.md` contains browser smoke tests.
+- `docs/neo4j.md` documents Neo4j storage expectations.
