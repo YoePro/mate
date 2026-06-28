@@ -1597,468 +1597,956 @@ Documentation checklist:
 * docs/accounts.md updated if any tool-level permission behavior changes.
 
 =============================================================================================================================================================================================
-0.13 Development
+0.13 Development - UI Foundation & Account Administration
 =============================================================================================================================================================================================
 
 Goal:
-Improve graph usability and continue domain modeling after the 0.11 entity and relationship work has been stabilized in 0.12.
+Make the MATE interface easier to use as a real daily tool by improving the top bar, toolbox, dialogs, account administration, network administration, relationship editing, and graph interaction.
 
 Scope:
-This version should focus on UX polish, safer graph manipulation, and the next set of domain modeling decisions. Features already delivered in 0.9 or 0.11 should not be reimplemented here. 0.13 may add new models, but only after the model decision is explicit enough to test.
-
-Already delivered before 0.13 and not repeated in this scope:
-
-* User-owned networks.
-* Global persons that can belong to multiple networks.
-* Network-specific person notes/context and graph positions.
-* Project as a first-class top-level graph entity.
-* Organization subtypes under Organization.type.
-* Modifier-key multi-select.
-* Select connected nodes.
-* Fit all nodes and fit selection.
+This version focuses on UI foundation and user-facing administration. It should improve how users create, edit, manage, select, and inspect data without introducing broad new graph domains.
 
 Implementation checklist:
 
-* Improve first-load graph framing:
+* Redesign the top bar into clear functional areas:
 
-  * Auto-center or fit the selected network graph after load when useful.
-  * Avoid fighting explicit user pan/zoom after the first graph frame.
-* Replace browser modal primitives:
+  * application identity
+  * selected network
+  * network search
+  * create menu
+  * network actions
+  * global search
+  * viewport actions
+  * account menu
+  * sign out
 
-  * Replace alert dialogs with real HTML dialogs.
-  * Replace confirm dialogs with real HTML dialogs.
-  * Replace prompt dialogs with real HTML dialogs.
-  * Reuse the same dialog foundation for network create/rename, delete/archive confirmation, relationship creation errors, and other UI actions.
-* Improve empty and neutral UI states:
+* Replace the current username text with an account menu.
+* Show the signed-in account name in the account menu trigger.
+* Add account menu actions:
 
-  * Replace misleading "Could not load attributes" copy with neutral empty states such as "No attributes" when the request succeeds but no data exists.
-  * Keep real errors distinguishable from empty data.
-* Add color configuration:
+  * My profile placeholder
+  * Preferences placeholder
+  * Account administration for owner/admin
+  * System settings placeholder for owner
+  * Sign out
 
-  * Allow choosing colors for supported node types or subtypes.
-  * Persist chosen colors in network-owned user preferences unless a later design explicitly promotes them to account-wide preferences.
-  * Decide whether color preferences are global, account-owned, or network-owned before storage is added.
-* Improve person name, honorific, and position modeling:
+* Add an Account Administration window.
+* Allow owner/admin to list accounts.
+* Allow owner/admin to create accounts.
+* Allow owner/admin to assign roles when creating accounts.
+* Allow owner/admin to disable accounts.
+* Allow owner/admin to change roles if permitted.
+* Hide or disable admin-only UI actions for users without permission.
+* Never show or expose existing passwords.
+* Add protection against removing the last usable owner account.
 
-  * Rename or repurpose the existing person title field so it is not used for both personal honorifics and occupational positions.
-  * Add a Person.honorific field for non-temporary personal forms such as Dr., Prof., HRH, HM, Sir, Dame, Rev., and similar forms.
-  * Add a Person.namePrefix field for culturally dependent name prefixes such as Mr., Mrs., Ms., Herr, Fru, and similar forms.
-  * Add a Person.nameSuffix field for post-nominal or suffix forms such as Jr., Sr., PhD, MD, DDS, MBA, and similar forms.
-  * Keep Person.honorific, Person.namePrefix, Person.nameSuffix, and occupational positions as separate concepts.
-  * Define Position as a dated role record rather than a person name field.
-  * Position examples include CEO, Chairman, Sales Manager, Developer, Teacher, King of Sweden, Queen of Sweden, Prince, Princess, Duke, Duchess, and similar roles.
-  * Support multiple Positions per person.
-  * Allow multiple Positions to be active at the same time.
-  * Allow each Position to have optional start and end dates.
-  * Allow each Position to reference an Organization when applicable.
-  * Allow each Position to reference a Project when applicable.
-  * Allow each Position to exist without an Organization or Project when the role is personal, ceremonial, historical, or otherwise context-specific.
-  * Update person create and edit UI so honorifics, name prefixes, name suffixes, and positions are edited independently.
-  * Update person profile UI so honorifics, name prefixes, name suffixes, and positions are displayed independently.
-  * Update graph node rendering so a compact person node may show honorific plus display name, but must not merge honorifics and positions into one field.
-  * Update API request and response models for Person and Position to reflect the separated fields.
-  * Update storage models so honorifics, name prefixes, name suffixes, and positions are stored separately.
-  * Update sample data to include people with honorifics, name prefixes, name suffixes, multiple positions, dated positions, and positions connected to organizations.
-  * Add Swedish Royal Family sample data to validate honorifics, family relationships, ceremonial positions, dated positions, and positions connected to organizations.
-* Add missing selection behavior:
+* Replace browser alert, confirm, and prompt usage with reusable HTML dialogs.
+* Add shared dialog patterns for:
 
-  * Implement drag-box selection with the mouse.
-  * Keep modifier-key multi-select behavior.
-  * Add Select same node type.
-  * Ensure selection tools work with hidden nodes and filtered graph state.
-* Add node safety tools:
+  * account creation
+  * account role editing
+  * account disable confirmation
+  * network creation
+  * network rename
+  * network archive/delete confirmation
+  * relationship editing
+  * relationship creation errors
+  * general confirmation flows
 
-  * Add node locking to prevent accidental movement.
-  * Make auto layout respect locked nodes.
-  * Add unlock behavior.
-  * Decide whether lock state is persisted globally or per network.
-* Add right-click context menus:
+* Add network administration from the top bar.
+* Add a network actions button or menu near the selected network.
+* Network actions should include:
 
-  * Provide context menus for all visible node types.
-  * Include common actions such as edit, archive, create relationship, fit selection, hide, lock, and unlock where relevant.
-  * Add reusable context creation actions while keeping toolbox creation available.
-* Decide and implement the next domain entity model:
+  * create network
+  * rename current network
+  * edit network metadata
+  * archive current network
+  * delete current network as an advanced action if supported
+  * manage networks
 
-  * Decide whether Family should be a first-class node, a group/entity, a network concept, or a relationship cluster.
-  * If Family is implemented, add API, storage, graph rendering, creation UI, relationship options, and tests.
-  * Decide whether Event should be a first-class node or an attached timeline/context object.
-  * If Event is implemented, support event categories such as meeting, wedding, conference, birthday, trip, dinner, and school reunion.
-  * Decide whether Interest should be a first-class node, a tag-like classification, or a profile attribute.
-  * If Interest is implemented, define how it differs from Tag.
-* Prepare for future collaboration:
+* Treat network deletion as advanced and dangerous.
+* Require explicit confirmation before network archive/delete.
+* For Social Network networks, network archive/delete must not automatically delete global Person identities.
+* For future diagram-only domains, network deletion may remove network-local nodes only when the domain model explicitly allows it.
 
-  * Keep network-owned private information private by default.
-  * Do not introduce implicit sharing.
-  * Ensure new model decisions do not break future explicit collaboration permissions.
+* Redesign the left toolbox into clearer grouped sections:
+
+  * Navigation
+  * Selection
+  * Graph
+  * Create
+  * Data
+  * Domain-specific tools when domains exist later
+
+* Make the toolbox visually calmer than the current 0.12 version.
+* Give toolbox actions consistent icon, label, tooltip, and disabled state.
+* Separate creation tools from graph action tools.
+* Mark disabled or future tools clearly.
+* Review whether the toolbox should be collapsible.
+* Review whether the toolbox should support compact and expanded modes.
+
+* Add first right-click context menu support where reasonable.
+* Right-click on a node should open a node context menu.
+* Right-click on a relationship should open a relationship context menu.
+* Right-click on empty canvas should open a canvas context menu.
+
+* Node context menu candidates:
+
+  * Edit
+  * Create relationship from this node
+  * Duplicate
+  * Archive
+  * Hide
+  * Lock
+  * Unlock
+  * Fit selection
+
+* Relationship context menu candidates:
+
+  * Edit relationship
+  * Delete/archive relationship
+  * Show connected nodes
+  * Select connected nodes
+
+* Canvas context menu candidates:
+
+  * Create node here
+  * Paste
+  * Fit all nodes
+  * Reset zoom
+  * Clear selection
+
+* Clicking a relationship should open or focus a relationship property dialog.
+* The relationship property dialog should show:
+
+  * source node
+  * target node
+  * relationship type
+  * custom label if applicable
+  * role/context fields where applicable
+  * start date
+  * end date
+  * current flag
+  * notes
+
+* Improve graph first-load behavior.
+* Auto-fit or auto-center the selected network graph after initial load when useful.
+* Do not override explicit user pan or zoom after the user has moved the viewport.
+
+* Add drag-box selection.
+* Add Select same node type.
+* Ensure selection behavior works with hidden, filtered, and locked nodes.
+
+* Add node locking.
+* Locked nodes must not move by accidental drag.
+* Auto layout must respect locked nodes.
+* Add unlock behavior.
+* Decide whether lock state is stored per network.
+
+* Improve attribute empty states.
+* Show neutral empty-state text when an API request succeeds but no records exist.
+* Keep real API errors visually different from empty data.
+
+* Add first color preference design.
+* Decide whether UI color preferences are account-owned or network-owned before persistence.
+* If implemented, allow supported node type colors to be changed.
+* Do not break Person gender color behavior unless an explicit override rule is documented.
+
+* Add a date input UI suitable for graph/profile dialogs.
+* Use the same date input pattern for relationship dates, attributes, and future timeline entries.
 
 Acceptance criteria:
 
-* 0.13 does not reimplement completed 0.9 or 0.11 features as new work.
-* New network graph load frames the graph usefully without disrupting later user navigation.
-* Browser-native alert, confirm, and prompt dialogs are no longer used in the normal graph UI flows touched by this version.
-* Attribute empty states distinguish empty data from real load failures.
-* Color customization has a decided ownership scope before persistence is added.
-* Person honorifics and positions are no longer forced into one field.
-* A person can have multiple dated positions if the position model is implemented in this version.
-* Drag-box selection works together with existing modifier-key selection.
-* Select same node type works for supported graph node types.
-* Locked nodes cannot be moved accidentally.
+* The top bar is understandable and role-aware.
+* The signed-in account is shown as an account menu.
+* Owner/admin users can list accounts.
+* Owner/admin users can create accounts.
+* Owner/admin users can assign valid roles.
+* Owner/admin users can disable accounts if permitted.
+* Admin-only UI actions are hidden or disabled for users without permission.
+* Existing passwords are never displayed.
+* The last usable owner account cannot be accidentally disabled or demoted.
+* Normal UI flows touched by this version no longer depend on browser alert, confirm, or prompt.
+* Network creation and network editing are available through UI dialogs.
+* Network archive/delete actions require explicit confirmation.
+* The toolbox is grouped and visually calmer.
+* Disabled or future tools are clearly marked.
+* Right-click menus exist for nodes, relationships, and empty canvas where implemented.
+* Relationship click opens or focuses relationship editing.
+* Initial graph framing is useful without overriding later user pan/zoom.
+* Drag-box selection works.
+* Select same node type works.
+* Locked nodes cannot be accidentally dragged.
 * Auto layout does not move locked nodes.
-* Right-click context menus expose relevant actions without replacing the toolbox.
-* Family, Event, and Interest each have an explicit model decision, even if only one of them is implemented in 0.13.
-* Any newly implemented entity type has API, storage, frontend creation, graph rendering, and relationship behavior sufficient for manual testing.
-* Network ownership boundaries remain intact.
+* Empty states distinguish “no data” from “could not load”.
+* Backend permission checks remain authoritative.
 
 Test checklist:
 
 * Run go test ./...
 * Run go vet ./...
 * Run frontend JavaScript syntax checks.
-* Test graph auto-centering on network load with:
+* Log in as owner.
+* Open account menu.
+* Confirm Account Administration is visible for owner.
+* Create an account as owner.
+* List accounts as owner.
+* Change account role as owner if implemented.
+* Disable an account as owner.
+* Confirm passwords are never shown.
+* Confirm last owner protection.
+* Log in as admin.
+* Confirm allowed admin account actions.
+* Log in as editor.
+* Confirm Account Administration is hidden or unavailable.
+* Log in as viewer.
+* Confirm create/edit actions are hidden or disabled where appropriate.
+* Attempt direct API calls as non-admin and confirm backend rejects account administration actions.
+* Test account creation with invalid role.
+* Test account creation with missing username.
+* Test account creation with weak or missing password if password rules exist.
+* Test duplicate username handling.
+* Test all replaced dialogs:
 
-  * empty graph
-  * one node
-  * many nodes
-  * after user has panned or zoomed
-* Test all replaced HTML dialogs:
-
+  * create account
+  * disable account
   * create network
   * rename network
-  * archive/delete confirmation
-  * custom relationship creation
-  * relevant error flows
-* Test attribute empty state versus real API failure.
-* Test color selection and persistence if implemented.
-* Test honorific and multiple dated position behavior if implemented.
-* Test position-to-organization references if implemented.
-* Test drag-box selection.
-* Test modifier-key selection still works after drag selection is added.
-* Test Select same node type.
-* Test node locking.
-* Test auto layout with locked and unlocked nodes.
-* Test right-click context menus for:
+  * archive/delete network
+  * edit relationship
 
-  * Person
-  * Organization
-  * Project
-  * any new entity type implemented in 0.13
-* Test context creation actions.
-* Test the selected Family/Event/Interest modeling decision.
-* Test non-owner direct API calls for every new network-scoped behavior.
-* Test browser reload after using new UI state such as colors, locks, dialogs, or new entities.
+* Test network actions from the top bar.
+* Test redesigned toolbox in desktop width.
+* Test redesigned toolbox in narrower browser width.
+* Test tool disabled states.
+* Test right-click menu on Person.
+* Test right-click menu on Organization.
+* Test right-click menu on Project.
+* Test right-click menu on Relationship.
+* Test right-click menu on empty canvas.
+* Test relationship click opens property dialog.
+* Test relationship date fields.
+* Test relationship notes field.
+* Test graph initial framing with empty graph, one node, many nodes, user pan, user zoom, and network switch.
+* Test drag-box selection with no nodes, one node, and many nodes.
+* Test Select same node type for Person, Organization, and Project.
+* Test node lock.
+* Test node unlock.
+* Test dragging a locked node.
+* Test auto layout with locked and unlocked nodes.
+* Test empty attribute list.
+* Test real attribute API failure.
+* Restart MATE and confirm persisted UI state still behaves correctly where persistence was implemented.
 
 Documentation checklist:
 
-* Update docs/api.md for any new or changed endpoints.
-* Update docs/storage.md for new model decisions and storage ownership scope.
-* Update docs/neo4j.md for new labels, relationship metadata, constraints, and indexes.
-* Update docs/frontend-smoke-test.md with 0.13 graph UX checks.
-* Update docs/ui-concept.md if context menus, dialogs, or toolbox behavior materially change.
+* Update docs/frontend-smoke-test.md with 0.13 top bar, toolbox, dialog, account UI, context menu, and graph interaction checks.
+* Update docs/accounts.md with browser-based account administration behavior.
+* Update docs/api.md for any changed or newly exposed account, network, or relationship endpoints.
+* Update docs/ui-concept.md with top bar structure, account menu, network menu, toolbox grouping, dialogs, and context menu behavior.
+* Update docs/storage.md if node lock state, color preferences, or UI preferences are persisted.
+* Update docs/neo4j.md if account, preference, lock, or relationship metadata storage changes.
 * Update roadmap.txt with completion notes when 0.13 is done.
 
 =============================================================================================================================================================================================
-0.14 Test / Debug
+0.14 Debug & Test - UI Foundation & Account Administration
 =============================================================================================================================================================================================
 
 Goal:
-Stabilize graph usability, dialogs, selection behavior, node locking, and any domain model work introduced in 0.13.
+Stabilize the UI foundation, account administration, network administration, toolbox redesign, context menus, relationship dialogs, selection behavior, and node locking introduced in 0.13.
 
 Scope:
-This version should harden 0.13 work before domain-based toolbox development begins. No broad new product concepts should be added here unless they are required to fix or safely complete 0.13 behavior.
+This version should harden the 0.13 user interface and administration work. No broad new product concepts should be added here unless they are required to fix, complete, or safely stabilize 0.13 behavior.
 
 Implementation checklist:
 
-* Add focused tests or repeatable smoke checks for HTML dialogs.
-* Add focused tests or repeatable smoke checks for graph auto-framing on load.
-* Add focused tests or repeatable smoke checks for drag-box selection and Select same type.
-* Add focused tests or repeatable smoke checks for node locking and auto layout with locked nodes.
-* Add focused tests or repeatable smoke checks for right-click context menus.
-* Add focused tests for any Family, Event, or Interest model work completed in 0.13.
-* Verify color configuration scope and persistence if color configuration was implemented in 0.13.
-* Verify person honorific, name prefix, name suffix, and position behavior if implemented in 0.13.
-* Verify network ownership boundaries for every new 0.13 UI action and API endpoint.
+* Review all 0.13 UI changes for consistency and regressions.
+* Stabilize top bar layout across supported desktop widths.
+* Verify account menu visibility and role-aware behavior.
+* Verify Account Administration window behavior.
+* Verify account list loading, empty states, errors, and refresh behavior.
+* Verify account creation validation.
+* Verify role assignment validation.
+* Verify account disable behavior.
+* Verify last usable owner protection.
+* Verify admin-only UI actions cannot bypass backend permissions.
+* Stabilize shared HTML dialog behavior.
+* Confirm normal UI flows do not use browser alert, confirm, or prompt.
+* Verify network administration dialogs.
+* Verify network archive/delete confirmation behavior.
+* Verify Social Network network archive/delete does not delete global Person identities.
+* Stabilize redesigned toolbox layout, grouping, tooltips, disabled states, and compact behavior if implemented.
+* Stabilize right-click context menus for nodes, relationships, and empty canvas.
+* Verify context menus do not open in the wrong graph state.
+* Verify context menus close predictably on click outside, escape, action selection, and graph movement.
+* Stabilize relationship click and relationship property dialog behavior.
+* Verify relationship editing preserves relationship type, attributes, notes, and date fields.
+* Stabilize graph initial framing after login, reload, and network switch.
+* Verify first-load framing does not override explicit user pan or zoom.
+* Stabilize drag-box selection.
+* Stabilize Select same node type.
+* Stabilize node locking and unlock behavior.
+* Verify auto layout respects locked nodes.
+* Verify attribute empty states versus real API failures.
+* Stabilize date input behavior across relationship, attribute, and profile dialogs.
+* Verify color preference behavior if implemented in 0.13.
+* Update documentation after all debug findings.
+
+Acceptance criteria:
+
+* 0.13 UI changes are stable enough for later domain-toolbox work.
+* Top bar remains usable and understandable at supported desktop widths.
+* Account menu actions are role-aware and predictable.
+* Owner/admin can reliably list, create, role-edit, and disable accounts where permitted.
+* Non-admin users cannot access account administration through UI or direct API calls.
+* The last usable owner account cannot be disabled or demoted.
+* Shared HTML dialogs behave consistently.
+* Network administration actions are safe and confirmation-gated.
+* Toolbox grouping and disabled states are visually clear.
+* Right-click context menus work predictably for supported graph targets.
+* Context menus do not bypass role, network, or ownership permissions.
+* Relationship editing works through click and context menu flows.
+* Graph framing, selection, and locking do not corrupt graph state.
+* Auto layout does not move locked nodes.
+* Empty states and real errors are visually distinct.
+* Documentation matches the stabilized behavior.
+
+Test checklist:
+
+* Run go test ./...
+* Run go vet ./...
+* Run frontend JavaScript syntax checks.
+* Test clean browser load after login.
+* Test browser reload on graph page.
+* Test top bar at normal desktop width.
+* Test top bar at narrower supported width.
+* Test account menu as owner.
+* Test account menu as admin.
+* Test account menu as editor.
+* Test account menu as viewer.
+* Test Account Administration visibility by role.
+* Test account list loading.
+* Test empty account list state if possible.
+* Test account list API failure.
+* Test account creation happy path.
+* Test account creation with duplicate username.
+* Test account creation with missing username.
+* Test account creation with missing password.
+* Test account creation with invalid role.
+* Test role change happy path if implemented.
+* Test role change blocked for invalid role.
+* Test disabling an account.
+* Test disabling the last usable owner account is blocked.
+* Test direct API account administration calls as editor/viewer.
+* Test all shared HTML dialogs for open, cancel, submit, validation error, close, and escape behavior.
+* Test network create dialog.
+* Test network rename dialog.
+* Test network metadata edit dialog.
+* Test network archive confirmation.
+* Test network delete confirmation if implemented.
+* Test that Social Network network archive/delete does not delete global Person identities.
+* Test toolbox group rendering.
+* Test toolbox tooltips.
+* Test toolbox disabled states.
+* Test toolbox compact/collapsed mode if implemented.
+* Test right-click node menu for Person.
+* Test right-click node menu for Organization.
+* Test right-click node menu for Project.
+* Test right-click relationship menu.
+* Test right-click empty canvas menu.
+* Test context menu close on outside click.
+* Test context menu close on escape.
+* Test context menu close after action.
+* Test relationship click opens property dialog.
+* Test relationship context menu opens property dialog.
+* Test relationship type display.
+* Test relationship custom label display.
+* Test relationship role/context fields.
+* Test relationship start date.
+* Test relationship end date.
+* Test relationship current flag.
+* Test relationship notes.
+* Test graph framing with empty graph.
+* Test graph framing with one node.
+* Test graph framing with many nodes.
+* Test graph framing after network switch.
+* Test graph framing after user pan.
+* Test graph framing after user zoom.
+* Test drag-box selection with no nodes.
+* Test drag-box selection with one node.
+* Test drag-box selection with many nodes.
+* Test modifier-key multi-select still works.
+* Test Select same node type for Person.
+* Test Select same node type for Organization.
+* Test Select same node type for Project.
+* Test node lock.
+* Test node unlock.
+* Test dragging locked node is blocked.
+* Test dragging unlocked node still works.
+* Test auto layout with locked and unlocked nodes.
+* Test empty attribute list.
+* Test real attribute API failure.
+* Test date input with complete date.
+* Test date input with empty date.
+* Test invalid date handling if validation exists.
+* Test color preference persistence if implemented.
+* Restart MATE and confirm accounts, network metadata, relationship edits, locks, and UI preferences persist where persistence was implemented.
+
+Documentation checklist:
+
+* Update docs/frontend-smoke-test.md with finalized 0.14 UI test checklist.
+* Update docs/accounts.md with stabilized account administration behavior.
+* Update docs/ui-concept.md with finalized top bar, toolbox, dialogs, and context menu behavior.
+* Update docs/api.md if account, network, or relationship behavior changed during stabilization.
+* Update docs/storage.md if persistence behavior changed during stabilization.
+* Update docs/neo4j.md if account, lock, relationship, preference, or network metadata storage changed.
+* Update roadmap.txt with 0.14 completion notes.
+
+=============================================================================================================================================================================================
+0.15 Development - Domain Toolboxes & Visual Work Modes
+=============================================================================================================================================================================================
+
+Goal:
+Introduce domain-based toolboxes and visual work modes so MATE can support different graph use cases without mixing social identity behavior with diagram-only graph behavior.
+
+Scope:
+This version introduces the first practical Domain concept in the UI. Social Network remains the default domain. One or more experimental non-social domains may be added as proof of concept, but configurable Domain Definitions are not required yet.
+
+Implementation checklist:
+
+* Add Domain as a UI and network metadata concept.
+* Keep Social Network as the default domain.
+* Store selected domain on network metadata if persistence is needed.
+* Add domain selector UI.
+* Ensure changing domain changes available toolbox content.
+* Ensure each domain can define:
+
+  * visible node types
+  * visible relationship types
+  * default node colors
+  * default relationship styles
+  * default creation tools
+  * default context menu actions
+  * default export/print intent for later versions
+
+* Define Social Network toolbox.
+* Define at least one experimental non-social toolbox.
+* Suggested first experimental domain: Flowchart.
+* Flowchart node types may include:
+
+  * Start
+  * Stop
+  * Process
+  * Decision
+  * Input
+  * Output
+  * Merge
+  * Delay
+
+* Flowchart relationship types may include:
+
+  * next
+  * yes
+  * no
+  * loop
+  * error
+
+* Add first visual work mode concept.
+* Supported initial work mode candidates:
+
+  * relationship map
+  * flowchart
+  * timeline
+  * roadmap
+  * event sequence
+  * interface sketch
+
+* Keep work modes lightweight in 0.15.
+* A work mode may influence toolbox ordering, default layout, visual labels, and future export/print behavior.
+* Do not make work modes a fully configurable database model in 0.15.
+* Do not add user-defined custom domains in 0.15.
+* Do not add database-backed domain editing in 0.15.
+
+* Ensure Social Network duplicate detection only runs for social identity node creation.
+* Ensure Flowchart or other diagram-only domains do not trigger Person or Organization duplicate detection.
+* Ensure global identity search is not run implicitly for diagram-only nodes.
+* Ensure domain-specific search is scoped to relevant node types.
+* Ensure network discovery can show or filter by domain metadata when available.
+* Ensure non-owned network search results expose only safe metadata.
+* Ensure existing account, role, and network ownership rules remain authoritative.
+
+Acceptance criteria:
+
+* User can create or open a Social Network network.
+* User can create or open an experimental Flowchart network if implemented.
+* User can see which domain a network belongs to.
+* User can switch toolbox behavior based on selected domain.
+* Social Network toolbox shows social relationship tools.
+* Flowchart toolbox shows flowchart node and relationship tools.
+* Unavailable node types are hidden or disabled in the wrong domain.
+* Flowchart node creation does not trigger Person or Organization duplicate prompts.
+* Global identity search does not run implicitly in non-identity domains.
+* Network discovery can distinguish networks by domain metadata if persisted.
+* Work modes are represented clearly enough for later timeline, roadmap, sequence, and interface-sketch work.
+* Domain logic is isolated enough that 0.17 can convert it into configurable Domain Definitions.
+* Existing Social Network behavior remains usable.
+
+Test checklist:
+
+* Run go test ./...
+* Run go vet ./...
+* Run frontend JavaScript syntax checks.
+* Test default Social Network domain.
+* Test creating a Social Network network.
+* Test opening a Social Network network.
+* Test Social Network toolbox content.
+* Test creating Person, Organization, and Project from Social Network toolbox.
+* Test Social Network relationship creation.
+* Test duplicate detection during Social Network Person creation.
+* Test switching to Flowchart domain if implemented.
+* Test creating a Flowchart network if implemented.
+* Test opening a Flowchart network if implemented.
+* Test Flowchart toolbox content.
+* Test creating Start, Stop, Process, and Decision nodes if implemented.
+* Test creating next, yes, no, loop, and error relationships if implemented.
+* Test that Flowchart node creation does not show social duplicate prompts.
+* Test that Flowchart search does not run global Person or Organization search.
+* Test unavailable Social Network node types are hidden or disabled in Flowchart.
+* Test unavailable Flowchart node types are hidden or disabled in Social Network.
+* Test network search/discovery with domain metadata.
+* Test non-owned network discovery result exposes only safe metadata.
+* Test browser reload keeps or restores a safe domain state.
+* Test direct API calls with invalid domain values.
+* Test direct API calls with invalid node type for selected domain.
+* Test direct API calls with invalid relationship type for selected domain.
+* Test role and ownership permissions remain enforced.
+
+Documentation checklist:
+
+* Update docs/ui-concept.md with Domain selector, domain-specific toolbox behavior, and work mode concept.
+* Update docs/frontend-smoke-test.md with 0.15 domain toolbox checks.
+* Update docs/api.md if Domain is exposed through network or graph APIs.
+* Update docs/storage.md if Domain is persisted on networks.
+* Update docs/neo4j.md if Domain metadata is stored in Neo4j.
+* Add notes for why identity matching must be domain-aware.
+* Update roadmap.txt with 0.15 completion notes.
+
+=============================================================================================================================================================================================
+0.16 Debug & Test - Domain Toolboxes & Visual Work Modes
+=============================================================================================================================================================================================
+
+Goal:
+Stabilize the domain-based toolbox and visual work mode behavior introduced in 0.15.
+
+Scope:
+This version should test and harden domain selection, network domain metadata, domain-specific toolbox behavior, visual work modes, and domain-aware identity/search rules. It should not introduce configurable Domain Definitions; that belongs in 0.17.
+
+Implementation checklist:
+
+* Fix bugs found in 0.15 domain switching.
+* Verify Social Network remains the default domain.
+* Verify existing networks load safely with or without domain metadata.
+* Verify selected domain is restored safely after browser reload.
+* Verify invalid or missing domain metadata falls back predictably.
+* Verify domain selector behavior.
+* Verify domain-specific toolbox rendering.
+* Verify domain-specific node creation.
+* Verify domain-specific relationship creation.
+* Verify unavailable node types are hidden or disabled in the wrong domain.
+* Verify unavailable relationship types are hidden or rejected in the wrong domain.
+* Verify visual work mode behavior if implemented in 0.15.
+* Verify non-social domains do not trigger global Person or Organization duplicate detection.
+* Verify global identity search does not run implicitly in diagram-only domains.
+* Verify network discovery uses only safe domain metadata.
+* Verify role and ownership rules remain authoritative.
 * Update documentation after debug findings.
 
 Acceptance criteria:
 
-* 0.13 UI changes are stable enough to build 0.15 domain-based tooling on top of them.
-* Dialog behavior is predictable and does not block remote/browser workflows.
-* Selection and node locking do not corrupt graph state.
-* Auto layout respects locked nodes.
-* Context menus do not bypass role or network ownership checks.
-* Any newly introduced entity model has documented limitations and tested persistence behavior.
+* Domain switching is stable.
+* Social Network remains the safe default.
+* Existing Social Network networks are not broken by domain support.
+* Invalid domain metadata does not crash the UI.
+* Toolboxes reflect the active domain.
+* Domain-specific node and relationship creation is predictable.
+* Flowchart or other non-social domains do not trigger social duplicate matching.
+* Network discovery can distinguish domains without exposing private graph content.
+* Visual work mode behavior is stable enough to build on later.
+* Backend validation rejects invalid domain/node/relationship combinations where implemented.
+* Documentation matches stabilized behavior.
 
 Test checklist:
 
 * Run go test ./...
 * Run go vet ./...
 * Run frontend JavaScript syntax checks.
-* Test graph load framing after login, network switch, reload, and empty graph.
-* Test every HTML dialog that replaced alert, confirm, or prompt.
-* Test drag-box selection with no nodes, one node, and many nodes.
-* Test Select same type with Person, Organization, Project, and any 0.13 entity type.
-* Test node lock, unlock, drag prevention, reload, and auto layout.
-* Test context menus for all visible node types.
-* Test non-owner direct API calls for all new 0.13 behavior.
-* Test browser reload and application restart after 0.13 changes.
-
-Documentation checklist:
-
-* Update docs/frontend-smoke-test.md with stabilized 0.13 checks.
-* Update docs/api.md if endpoint behavior changed during stabilization.
-* Update docs/storage.md if persistence behavior changed during stabilization.
-* Update docs/neo4j.md if labels, constraints, or relationship behavior changed during stabilization.
-* Update roadmap.txt with 0.14 completion notes.
-
-=============================================================================================================================================================================================
-0.15 Development
-=============================================================================================================================================================================================
-
-Goal:
-Introduce domain-based toolboxes so MATE can support more graph use cases while keeping Social Network as the first and primary domain.
-
-Scope:
-This version should introduce the Domain concept without turning MATE into a fully generic graph editor yet. Domain definitions may be hardcoded in Go or JavaScript for this version.
-
-If this work grows beyond a small proof of concept, it should be explicitly deferred to 1.x rather than blocking the first stable MATE release.
-
-Implementation checklist:
-
-* Add Domain as a UI and data concept.
-* Keep Social Network as the default domain.
-* Add a domain key to network metadata if persistence is needed for safe discovery and reload behavior.
-* Define Social Network toolbox as the first domain toolbox.
-* Allow a domain to define visible node types.
-* Allow a domain to define visible relationship types.
-* Allow a domain to define default node colors.
-* Allow a domain to define default relationship styles.
-* Add domain selector UI.
-* Ensure changing domain changes toolbox contents.
-* Ensure network search/discovery can show or filter by domain metadata when available.
-* Ensure Social Network duplicate detection is only active while the active domain supports social identity nodes.
-* Ensure Flowchart and other non-social proof-of-concept domains do not trigger Person or Organization duplicate detection.
-* Ensure existing Social Network behavior remains unchanged.
-* Add at least one experimental non-social domain as a hardcoded proof of concept.
-* Suggested first experimental domain: Flowchart.
-* Flowchart node types may include Start, Stop, Process, Decision, Input, Output, Merge, and Delay.
-* Flowchart relationship types may include next, yes, no, loop, and error.
-* Do not add user-defined custom domains in 0.15.
-* Do not add database-backed domain editing in 0.15.
-
-Acceptance criteria:
-
-* User can switch between Social Network and one experimental domain.
-* Toolbox contents change based on selected domain.
-* Network discovery can distinguish Social Network graphs from experimental domain graphs when domain metadata exists.
-* Social Network nodes and relationships still work.
-* Experimental domain can create and display its own node types.
-* Experimental non-social domains do not trigger global Person or Organization duplicate matching.
-* Domain logic is isolated enough that more domains can be added later without rewriting graph rendering.
-
-Test checklist:
-
-* Test default Social Network domain.
-* Test switching to experimental Flowchart domain.
-* Test network search/discovery with Social Network and Flowchart networks if domain metadata is persisted.
+* Test empty Social Network network.
+* Test populated Social Network network.
+* Test old network with missing domain metadata.
+* Test network with invalid domain metadata.
+* Test default domain after fresh login.
+* Test domain restoration after browser reload.
+* Test domain selector open, cancel, and change behavior.
+* Test switching from Social Network to Flowchart if implemented.
+* Test switching from Flowchart back to Social Network if implemented.
+* Test Social Network toolbox after switching domains.
+* Test Flowchart toolbox after switching domains if implemented.
 * Test creating Social Network nodes.
-* Test creating Flowchart nodes.
+* Test creating Social Network relationships.
+* Test creating Flowchart nodes if implemented.
+* Test creating Flowchart relationships if implemented.
+* Test invalid node type for selected domain through UI if possible.
+* Test invalid node type for selected domain through direct API call.
+* Test invalid relationship type for selected domain through UI if possible.
+* Test invalid relationship type for selected domain through direct API call.
 * Test that Flowchart node creation does not show Person or Organization duplicate prompts.
-* Test that unavailable node types are not shown in the wrong toolbox.
-* Test browser reload keeps or restores a safe default domain.
-* Run go test ./...
-* Run frontend syntax checks.
+* Test that Flowchart search does not run global Person or Organization search.
+* Test network search/discovery with Social Network domain metadata.
+* Test network search/discovery with Flowchart domain metadata if implemented.
+* Test non-owned network discovery result exposes only safe metadata.
+* Test visual work mode selection if implemented.
+* Test role and ownership permissions after domain switching.
+* Restart MATE and confirm domain metadata persists where persistence was implemented.
 
 Documentation checklist:
 
-* Update docs/ui-concept.md with Domain and toolbox behavior.
-* Update docs/storage.md if Domain is persisted.
-* Update docs/api.md if Domain is exposed through API.
-* Update roadmap.txt with completion notes.
-
-=============================================================================================================================================================================================
-0.16 Debug
-=============================================================================================================================================================================================
-
-Goal:
-Stabilize domain-based toolbox behavior.
-
-Scope:
-This version should test and harden the hardcoded domain proof of concept from 0.15. It should not introduce configurable Domain Definitions; that belongs in 0.17.
-
-Implementation checklist:
-
-* Fix bugs found in domain switching.
-* Verify Social Network remains the default.
-* Verify old networks are not broken by domain support.
-* Verify domain-specific node types render correctly.
-* Verify relationship creation respects current domain.
-* Verify invalid domain or node type handling.
-
-Acceptance criteria:
-
-* Domain switching is stable.
-* Existing Social Network data remains usable.
-* Invalid domain data does not crash the UI.
-
-Test checklist:
-
-* Test empty Social Network.
-* Test populated Social Network.
-* Test empty Flowchart.
-* Test populated Flowchart.
-* Test invalid domain value.
-* Test invalid node type for selected domain.
-
-Documentation checklist:
-
-* Update docs/ui-concept.md after domain toolbox test findings.
-* Update docs/storage.md if domain state persistence changed.
-* Update docs/api.md if domain API behavior changed.
+* Update docs/ui-concept.md after domain toolbox debug findings.
+* Update docs/frontend-smoke-test.md with finalized 0.16 domain toolbox checks.
+* Update docs/api.md if domain validation behavior changed.
+* Update docs/storage.md if domain metadata persistence changed.
+* Update docs/neo4j.md if domain metadata storage changed.
 * Update roadmap.txt with 0.16 completion notes.
 
 =============================================================================================================================================================================================
-0.17 Development
+0.17 Development - Configurable Domain Definitions
 =============================================================================================================================================================================================
 
 Goal:
-Convert domains from hardcoded concepts into configurable graph definitions.
+Convert domains from hardcoded UI concepts into configurable graph definitions so new domains can be added without rewriting the graph engine.
 
 Scope:
-This version introduces reusable domain definitions. New domains should be possible to add without modifying the graph rendering engine.
-
-This is a stretch goal for pre-1.0. If the implementation threatens 1.0 stability, keep 0.17 as a design/documentation milestone and move database-backed configurable domains to 1.x.
+This version introduces Domain Definitions as the formal model behind domain-specific node types, relationship types, toolbox behavior, identity rules, search rules, and default visual behavior. This is still a controlled development step, not a full user-facing domain editor.
 
 Implementation checklist:
 
-* Introduce a Domain Definition model.
-* Separate graph engine behavior from domain-specific configuration.
-* Define node types through Domain Definitions.
-* Define relationship types through Domain Definitions.
-* Define default node colors through Domain Definitions.
-* Define default node icons through Domain Definitions.
-* Define default relationship styles through Domain Definitions.
-* Define default property definitions for each node type.
-* Define default property definitions for each relationship type.
-* Define which node types may be connected by each relationship type.
-* Define domain discovery metadata, including domain key, display name, description, and whether networks in that domain are discoverable.
-* Validate relationship creation against the active Domain Definition.
-* Move the Social Network domain into a Domain Definition.
-* Move the Flowchart domain into a Domain Definition.
-* Add at least one additional proof-of-concept domain.
-* Suggested domains include Software Architecture, Home Automation, or Computer Network.
-* Ensure graph rendering uses only Domain Definitions and no hardcoded node knowledge.
-* Add identity behavior metadata to Domain Definitions.
-* Allow each node type to declare whether it represents a global identity, reusable concept, diagram-only node, or network-local node.
-* Allow each node type to declare whether duplicate detection is enabled.
-* Allow each node type to declare which fields are used for matching.
-* Allow each node type to declare search scope, such as global identity search, network-local search, domain-local search, or no search.
-* Allow each domain to define default network discovery behavior.
-* Ensure Social Network Person and Organization types can use identity matching.
-* Ensure Flowchart node types do not use Person or Organization duplicate matching.
-* Ensure search behavior follows the active domain and node type identity rules.
-* Ensure network discovery can filter by domain and does not expose private graph content.
+* Introduce Domain Definition model.
+* Keep built-in Domain Definitions controlled by application code, configuration files, or seed data.
+* Do not add a full browser UI for editing Domain Definitions in 0.17.
+* Define Domain Definition fields:
+
+  * key
+  * display name
+  * description
+  * version
+  * enabled flag
+  * default work mode
+  * discoverability behavior
+  * node type definitions
+  * relationship type definitions
+  * toolbox group definitions
+  * context menu definitions
+  * default visual style
+  * identity/search behavior
+
+* Define node type configuration:
+
+  * key
+  * display name
+  * plural display name
+  * icon
+  * color
+  * shape
+  * description
+  * allowed properties
+  * required properties
+  * default properties
+  * identity behavior
+  * duplicate detection behavior
+  * search scope
+  * whether the node is global, reusable, network-local, or diagram-only
+
+* Define relationship type configuration:
+
+  * key
+  * display name
+  * direction behavior
+  * allowed source node types
+  * allowed target node types
+  * required properties
+  * optional properties
+  * default properties
+  * default rendering style
+  * whether custom label is allowed
+  * whether relationship attributes are enabled
+
+* Define toolbox configuration:
+
+  * group key
+  * group label
+  * group order
+  * tool key
+  * tool label
+  * tool icon
+  * tool action
+  * required permission
+  * enabled/disabled state
+  * domain-specific visibility
+
+* Define context menu configuration:
+
+  * menu target type
+  * action key
+  * label
+  * required permission
+  * visible node types
+  * visible relationship types
+  * enabled/disabled rules
+
+* Move Social Network behavior into a Social Network Domain Definition.
+* Move Flowchart behavior into a Flowchart Domain Definition.
+* Add at least one additional proof-of-concept Domain Definition.
+* Suggested additional domains:
+
+  * Roadmap
+  * Timeline
+  * Event Sequence
+  * Software Architecture
+  * Computer Network
+  * Home Automation
+  * Interface Sketch
+
+* Ensure graph rendering uses Domain Definitions instead of hardcoded Social Network assumptions.
+* Ensure node creation validates against the active Domain Definition.
+* Ensure relationship creation validates against the active Domain Definition.
+* Ensure toolbox content is generated from the active Domain Definition.
+* Ensure context menus are filtered by the active Domain Definition.
+* Ensure invalid node types are rejected.
+* Ensure invalid relationship types are rejected.
+* Ensure invalid source/target pairs are rejected.
+
+* Add identity behavior metadata.
+* Supported identity behavior values should include:
+
+  * global_identity
+  * reusable_concept
+  * network_local
+  * diagram_only
+
+* Add search scope metadata.
+* Supported search scope values should include:
+
+  * global_identity_search
+  * network_search
+  * domain_search
+  * no_search
+
+* Add duplicate detection metadata.
+* Duplicate detection must be explicitly enabled per domain and node type.
+* Person duplicate detection must only run for node types that explicitly enable person identity matching.
+* Organization duplicate detection must only run for node types that explicitly enable organization identity matching.
+* Diagram-only nodes must never trigger global identity matching.
+
+* Add Domain Definition validation.
+* Validate unique domain keys.
+* Validate unique node type keys within a domain.
+* Validate unique relationship type keys within a domain.
+* Validate toolbox actions reference known node or relationship types.
+* Validate context menu actions reference known node or relationship types.
+* Validate relationship source/target node type references.
+* Validate default colors, icons, and shapes have safe fallbacks.
+* Validate unknown or disabled domains fail safely.
+
+* Add API endpoints if needed:
+
+  * GET /api/v1/domains
+  * GET /api/v1/domains/{key}
+  * GET /api/v1/domains/{key}/toolbox
+  * GET /api/v1/domains/{key}/node-types
+  * GET /api/v1/domains/{key}/relationship-types
+
+* Decide whether Domain Definitions are:
+
+  * built-in only
+  * file-backed
+  * database-backed
+  * built-in with optional file overrides
+
+* If file-backed Domain Definitions are implemented, add configuration for domain definition path.
+* If database-backed Domain Definitions are implemented, add Neo4j labels, constraints, and migration notes.
+* Keep Domain Definition loading deterministic.
+* Keep invalid Domain Definitions from breaking application startup unless explicitly configured as fatal.
+* Add safe fallback to Social Network when a selected domain is missing or invalid.
 
 Acceptance criteria:
 
-* Graph rendering contains no Social Network specific logic.
-* Social Network works entirely from its Domain Definition.
-* Flowchart works entirely from its Domain Definition.
-* A third domain can be added without changing graph rendering code.
-* Invalid relationships are rejected according to the Domain Definition.
-* Network discovery respects domain metadata and safe metadata boundaries.
-* Person duplicate detection only runs when the active domain supports Person identity matching.
-* Organization duplicate detection only runs when the active domain supports Organization identity matching.
-* Flowchart nodes do not trigger global person or organization matching.
-* Domain Definitions explicitly describe identity, search, discovery, and duplicate matching behavior.
+* Social Network works from a Domain Definition.
+* Flowchart works from a Domain Definition if implemented.
+* A third proof-of-concept domain can be added without changing graph rendering code.
+* Toolbox content is generated from Domain Definitions.
+* Context menu content is filtered by Domain Definitions.
+* Node creation is validated against the active Domain Definition.
+* Relationship creation is validated against the active Domain Definition.
+* Invalid relationship source/target pairs are rejected.
+* Duplicate detection only runs when explicitly enabled by the active Domain Definition and node type.
+* Diagram-only domains do not trigger Person or Organization identity matching.
+* Search behavior follows the active domain and node type rules.
+* Network discovery can use domain metadata without exposing private graph content.
+* Missing or invalid domain metadata falls back safely.
+* Existing Social Network data remains usable.
 
 Test checklist:
 
-* Test loading each available domain.
-* Test creating every supported node type.
-* Test creating valid relationships.
-* Test rejecting invalid relationships.
-* Test switching domains.
-* Test domain-aware network discovery.
-* Test global identity search in Social Network.
-* Test domain-local search in at least one non-social domain if implemented.
-* Test that global identity search does not run in Flowchart.
-* Test loading existing graphs after Domain Definition migration.
 * Run go test ./...
-* Run frontend syntax checks.
+* Run go vet ./...
+* Run frontend JavaScript syntax checks.
+* Test Domain Definition loading.
+* Test invalid Domain Definition loading.
+* Test duplicate domain key validation.
+* Test duplicate node type key validation.
+* Test duplicate relationship type key validation.
+* Test missing node type reference in relationship definition.
+* Test missing relationship type reference in toolbox definition.
+* Test missing node type reference in context menu definition.
+* Test Social Network Domain Definition.
+* Test Flowchart Domain Definition if implemented.
+* Test third proof-of-concept Domain Definition.
+* Test toolbox generation from Social Network Domain Definition.
+* Test toolbox generation from Flowchart Domain Definition.
+* Test context menu generation from Social Network Domain Definition.
+* Test context menu generation from Flowchart Domain Definition.
+* Test creating every Social Network node type.
+* Test creating every Flowchart node type if implemented.
+* Test creating every node type in the third proof-of-concept domain.
+* Test valid relationship creation for each domain.
+* Test invalid relationship source/target pair rejection.
+* Test invalid node type rejection through direct API call.
+* Test invalid relationship type rejection through direct API call.
+* Test invalid domain key through direct API call.
+* Test global identity search in Social Network.
+* Test that Flowchart does not run global Person or Organization search.
+* Test duplicate detection for Social Network Person creation.
+* Test that duplicate detection is not triggered for diagram-only node creation.
+* Test network discovery filtered by domain metadata.
+* Test non-owned network discovery exposes only safe metadata.
+* Test browser reload with valid selected domain.
+* Test browser reload with missing selected domain.
+* Test browser reload with disabled selected domain.
+* Test existing Social Network graph after Domain Definition migration.
+* Restart MATE and confirm Domain Definition behavior is stable.
 
 Documentation checklist:
 
 * Create docs/domain-definition.md.
-* Document the Domain Definition structure.
+* Document Domain Definition structure.
 * Document node type configuration.
 * Document relationship type configuration.
-* Update docs/api.md if Domain Definitions are API-visible.
-* Update docs/storage.md with Domain Definition ownership and persistence behavior.
+* Document toolbox configuration.
+* Document context menu configuration.
+* Document identity behavior values.
+* Document search scope values.
+* Document duplicate detection rules.
+* Document safe fallback behavior.
+* Update docs/api.md if Domain Definition endpoints are exposed.
+* Update docs/storage.md with Domain Definition loading and persistence decisions.
 * Update docs/neo4j.md if Domain Definitions are stored in Neo4j.
-* Update roadmap.txt.
+* Update docs/ui-concept.md with Domain Definition driven toolbox and context menu behavior.
+* Update docs/frontend-smoke-test.md with 0.17 Domain Definition checks.
+* Update roadmap.txt with 0.17 completion notes.
 
 =============================================================================================================================================================================================
-0.18 Debug / Test
+0.18 Debug & Test - Configurable Domain Definitions
 =============================================================================================================================================================================================
 
 Goal:
-Stabilize configurable Domain Definitions from 0.17.
+Stabilize configurable Domain Definitions introduced in 0.17.
 
 Scope:
-This version should harden Domain Definition loading, validation, graph rendering, relationship validation, and migration behavior before relationship rendering styles are added in 0.19.
+This version should harden Domain Definition loading, validation, toolbox generation, context menu generation, domain-aware search, duplicate detection, network discovery, and migration behavior. No broad new domain concepts should be added here.
 
 Implementation checklist:
 
-* Add tests for Domain Definition parsing/loading.
-* Add tests for node type definitions.
-* Add tests for relationship type definitions.
-* Add tests for property definitions.
-* Add tests for valid and invalid relationship pairs.
-* Add tests for domain-aware network discovery.
-* Add tests for domain-aware duplicate detection.
-* Add tests for domain-aware search scope.
-* Verify Social Network migration from hardcoded behavior to Domain Definition behavior.
-* Verify Flowchart migration from hardcoded behavior to Domain Definition behavior.
-* Verify invalid Domain Definitions fail safely.
-* Verify existing graphs still load after Domain Definition introduction.
-* Review whether Domain Definitions should be built-in, database-backed, file-backed, or a combination before 1.0.
+* Review all 0.17 Domain Definition behavior.
+* Stabilize Domain Definition loading.
+* Stabilize invalid Domain Definition handling.
+* Verify Social Network works fully from its Domain Definition.
+* Verify Flowchart works fully from its Domain Definition if implemented.
+* Verify the third proof-of-concept domain works without graph-engine changes.
+* Verify toolbox generation from Domain Definitions.
+* Verify context menu generation from Domain Definitions.
+* Verify node creation validation.
+* Verify relationship creation validation.
+* Verify invalid source/target relationship pairs are rejected.
+* Verify identity behavior metadata.
+* Verify search scope metadata.
+* Verify duplicate detection metadata.
+* Verify diagram-only domains never trigger global Person or Organization matching.
+* Verify existing Social Network graphs still load after migration.
+* Verify missing, disabled, or invalid selected domains fall back safely.
+* Decide whether Domain Definitions remain built-in, file-backed, database-backed, or mixed before later versions depend on them.
+* Update documentation after debug findings.
 
 Acceptance criteria:
 
-* Domain Definitions are stable enough for relationship style configuration in 0.19.
+* Domain Definitions are stable enough for relationship rendering style configuration in 0.19.
 * Invalid Domain Definitions cannot crash the UI or corrupt graph data.
-* Existing Social Network data remains usable.
-* Domain-specific validation rejects invalid relationships consistently.
-* Domain-specific search and discovery rules are enforced consistently.
-* Non-identity domains do not run social duplicate matching.
+* Social Network behavior is preserved through its Domain Definition.
+* Non-social domains remain isolated from social identity matching.
+* Toolbox and context menu generation are predictable.
+* Domain-specific validation rejects invalid nodes, relationships, and source/target pairs.
+* Search and duplicate detection follow active domain rules.
+* Network discovery uses safe metadata only.
+* Existing networks remain usable after Domain Definition migration.
+* Documentation matches stabilized behavior.
 
 Test checklist:
 
 * Run go test ./...
 * Run go vet ./...
 * Run frontend JavaScript syntax checks.
+* Test valid Domain Definition loading.
+* Test invalid Domain Definition loading.
+* Test missing Domain Definition fallback.
+* Test disabled Domain Definition fallback.
+* Test duplicate domain key rejection.
+* Test duplicate node type key rejection.
+* Test duplicate relationship type key rejection.
+* Test invalid toolbox references.
+* Test invalid context menu references.
+* Test invalid relationship source/target references.
 * Test Social Network Domain Definition.
-* Test Flowchart Domain Definition.
-* Test the third proof-of-concept Domain Definition from 0.17.
-* Test invalid node type definitions.
-* Test invalid relationship definitions.
-* Test invalid property definitions.
-* Test domain-aware discovery metadata.
-* Test Social Network identity search and duplicate detection.
-* Test Flowchart or another non-social domain without social identity matching.
-* Test loading existing graphs.
-* Test browser reload and application restart.
+* Test Flowchart Domain Definition if implemented.
+* Test third proof-of-concept Domain Definition.
+* Test toolbox generation for each domain.
+* Test context menu generation for each domain.
+* Test creating valid nodes in each domain.
+* Test rejecting invalid nodes in each domain.
+* Test creating valid relationships in each domain.
+* Test rejecting invalid relationships in each domain.
+* Test rejecting invalid source/target pairs.
+* Test global identity search in Social Network.
+* Test no global identity search in Flowchart or other diagram-only domain.
+* Test duplicate detection in Social Network Person creation.
+* Test no duplicate detection for diagram-only node creation.
+* Test network discovery filtered by domain metadata.
+* Test non-owned network discovery safe metadata only.
+* Test old Social Network graph without domain metadata.
+* Test browser reload with valid selected domain.
+* Test browser reload with invalid selected domain.
+* Test browser reload with disabled selected domain.
+* Restart MATE and confirm Domain Definition behavior remains stable.
 
 Documentation checklist:
 
-* Update docs/domain-definition.md after debug findings.
-* Update docs/api.md if Domain Definitions are API-visible.
-* Update docs/storage.md with final 0.18 Domain Definition persistence behavior.
-* Update docs/neo4j.md if Domain Definitions are stored in Neo4j.
+* Update docs/domain-definition.md after 0.18 findings.
+* Update docs/api.md if Domain Definition API behavior changed.
+* Update docs/storage.md with final 0.18 Domain Definition loading and persistence decision.
+* Update docs/neo4j.md if Domain Definition storage changed.
+* Update docs/ui-concept.md with stabilized Domain Definition driven toolbox and context menu behavior.
+* Update docs/frontend-smoke-test.md with finalized 0.18 checks.
 * Update roadmap.txt with 0.18 completion notes.
 
 =============================================================================================================================================================================================
-0.19 Development
+0.19 Development - Relationship Rendering
 =============================================================================================================================================================================================
 
 Goal:
@@ -2114,7 +2602,7 @@ Documentation checklist:
 * Update docs/frontend-smoke-test.md with relationship style checks.
 * Update roadmap.txt with 0.19 completion notes.
 =============================================================================================================================================================================================
-0.20 Debug & Test
+0.20 Debug - Relationship Rendering
 =============================================================================================================================================================================================
 
 Goal:
@@ -2234,7 +2722,7 @@ Documentation checklist:
 * Update roadmap.txt with completion notes.
 
 =============================================================================================================================================================================================
-0.22 Debug & Test
+0.22 Debug & Test - CLI & Log
 =============================================================================================================================================================================================
 - Stabilize CLI and logging.
 
@@ -2247,7 +2735,7 @@ Documentation checklist:
 - Do not add async workers yet.
 
 =============================================================================================================================================================================================
-0.24 Debug & Test
+0.24 Debug & Test - Internal Event Bus
 =============================================================================================================================================================================================
 - Stabilize event emission and ensure events do not change business behavior.
 
@@ -2259,7 +2747,7 @@ Documentation checklist:
 - Prepare for undo/redo without implementing full undo yet.
 
 =============================================================================================================================================================================================
-0.26 Debug & Test
+0.26 Debug & Test - Command History
 =============================================================================================================================================================================================
 - Stabilize command history.
 
@@ -2270,7 +2758,7 @@ Documentation checklist:
 - Start with node move, node create, relationship create, and relationship delete.
 
 =============================================================================================================================================================================================
-0.28 Debug & Test
+0.28 Debug & Test - Undo/Redo
 =============================================================================================================================================================================================
 - Stabilize undo/redo.
 
@@ -2280,7 +2768,7 @@ Documentation checklist:
 - Add copy, paste, duplicate, and cut for selected graph elements.
 
 =============================================================================================================================================================================================
-0.30 Debug & Test
+0.30 Debug & Test - Clipboard
 =============================================================================================================================================================================================
 - Stabilize clipboard behavior.
 
@@ -2290,9 +2778,27 @@ Documentation checklist:
 - Extract selection, viewport, renderer, and layout responsibilities into clearer modules.
 
 =============================================================================================================================================================================================
-0.32 Debug & Test
+0.32 Debug & Test - Graph Engine Boundaries
 =============================================================================================================================================================================================
 - Stabilize graph engine boundaries.
+
+=============================================================================================================================================================================================
+0.33 Development - Export & Print
+=============================================================================================================================================================================================
+
+=============================================================================================================================================================================================
+0.34 Debug & Test - Export & Print
+=============================================================================================================================================================================================
+
+=============================================================================================================================================================================================
+0.35 Development - Timeline / Roadmap / Sequence Views
+=============================================================================================================================================================================================
+
+=============================================================================================================================================================================================
+0.35 Debug & Test - Timeline / Roadmap / Sequence Views
+=============================================================================================================================================================================================
+
+
 
 =============================================================================================================================================================================================
 1.0 Stable
