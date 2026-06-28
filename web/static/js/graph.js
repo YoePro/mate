@@ -4,6 +4,7 @@ const graph = (() => {
   const nodes = [];
   const links = [];
   const hiddenNodeIds = new Set();
+  const lockedNodeIds = new Set();
   let selectedNodeId = null;
   const selectedNodeIds = new Set();
   let linkSourceId = null;
@@ -36,6 +37,7 @@ const graph = (() => {
     if (selectedNodeId === id) selectedNodeId = null;
     selectedNodeIds.delete(id);
     hiddenNodeIds.delete(id);
+    lockedNodeIds.delete(id);
     if (linkSourceId === id) linkSourceId = null;
     emit('nodes-changed', nodes);
     emit('links-changed', links);
@@ -59,6 +61,13 @@ const graph = (() => {
 
   function addLink(link) {
     links.push(link);
+    emit('links-changed', links);
+  }
+
+  function updateLink(id, data) {
+    const link = links.find(l => l.id === id);
+    if (!link) return;
+    Object.assign(link, data);
     emit('links-changed', links);
   }
 
@@ -112,6 +121,7 @@ const graph = (() => {
     nodes.length = 0;
     links.length = 0;
     hiddenNodeIds.clear();
+    lockedNodeIds.clear();
     selectedNodeId = null;
     selectedNodeIds.clear();
     linkSourceId = null;
@@ -136,6 +146,22 @@ const graph = (() => {
 
   function isNodeHidden(id) {
     return hiddenNodeIds.has(id);
+  }
+
+  function lockNodes(ids) {
+    (ids || []).forEach(id => {
+      if (id) lockedNodeIds.add(id);
+    });
+    emit('nodes-changed', nodes);
+  }
+
+  function unlockNodes(ids) {
+    (ids || []).forEach(id => lockedNodeIds.delete(id));
+    emit('nodes-changed', nodes);
+  }
+
+  function isNodeLocked(id) {
+    return lockedNodeIds.has(id);
   }
 
   function load(data) {
@@ -202,9 +228,10 @@ const graph = (() => {
     get selectedNodeId() { return selectedNodeId; },
     get selectedNodeIds() { return Array.from(selectedNodeIds); },
     get hiddenNodeIds() { return Array.from(hiddenNodeIds); },
+    get lockedNodeIds() { return Array.from(lockedNodeIds); },
     get linkSourceId() { return linkSourceId; },
     on, addNode, removeNode, updateNodePosition, updateNodeData,
-    addLink, removeLink, selectNode, toggleNodeSelection, selectNodes, isNodeSelected, setLinkSource,
-    getNode, getLink, getNodeLinks, hideNodes, showHiddenNodes, isNodeHidden, load, clear,
+    addLink, updateLink, removeLink, selectNode, toggleNodeSelection, selectNodes, isNodeSelected, setLinkSource,
+    getNode, getLink, getNodeLinks, hideNodes, showHiddenNodes, isNodeHidden, lockNodes, unlockNodes, isNodeLocked, load, clear,
   };
 })();

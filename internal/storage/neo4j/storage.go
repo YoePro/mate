@@ -1465,6 +1465,56 @@ func (s *Storage) GetRelationship(ctx context.Context, id string) (*models.Relat
 	return value.(*models.Relationship), nil
 }
 
+// UpdateRelationship updates editable relationship properties.
+func (s *Storage) UpdateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error) {
+	relType := string(relationship.Type)
+	query := fmt.Sprintf(`
+		MATCH (source)-[old]->(target)
+		WHERE old.id = $id
+		DELETE old
+		CREATE (source)-[r:%s {
+			id: $id,
+			network_id: $network_id,
+			source_type: $source_type,
+			target_type: $target_type,
+			custom_label: $custom_label,
+			role: $role,
+			start_date: $start_date,
+			end_date: $end_date,
+			current: $current,
+			notes: $notes
+		}]->(target)
+		RETURN r.id AS id,
+		       r.network_id AS network_id,
+		       type(r) AS type,
+		       source.id AS source_id,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
+		       target.id AS target_id,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       r.custom_label AS custom_label,
+		       r.role AS role,
+		       r.start_date AS start_date,
+		       r.end_date AS end_date,
+		       r.current AS current,
+		       r.notes AS notes`, relType)
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, query, relationshipParams(relationship))
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		updated := relationshipFromRecord(record)
+		return &updated, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.Relationship), nil
+}
+
 // ListRelationships returns all relationships.
 func (s *Storage) ListRelationships(ctx context.Context) ([]models.Relationship, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {

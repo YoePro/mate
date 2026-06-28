@@ -17,6 +17,15 @@
   cursor: grabbing;
 }
 
+.selection-marquee {
+  position: absolute;
+  z-index: 40;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18);
+}
+
 #workspace-inner {
   position: absolute;
   top: 0;
@@ -87,6 +96,7 @@
 }
 
 .node-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -180,6 +190,32 @@
     rgba(0,0,0,0.3) 4px,
     rgba(0,0,0,0.3) 6px
   );
+}
+
+.graph-node.node-locked .node-card::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: calc(50% - 31px);
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.graph-node.node-locked .node-card::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 26px);
+  width: 6px;
+  height: 5px;
+  border: 1.5px solid var(--text-muted);
+  border-top: 0;
+  border-radius: 1px;
+  z-index: 1;
 }
 
 /* Graph links */

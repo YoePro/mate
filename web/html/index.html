@@ -52,6 +52,27 @@
             <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
           </svg>
         </button>
+        <div class="network-actions-wrap">
+          <button id="btn-network-actions" class="btn-icon" title="Network actions" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="19" cy="12" r="1"/>
+              <circle cx="5" cy="12" r="1"/>
+            </svg>
+          </button>
+          <div id="network-actions-menu" class="network-actions-menu hidden">
+            <button class="network-action-item" type="button" data-network-action="create">Create network</button>
+            <button class="network-action-item" type="button" data-network-action="rename">Rename current network</button>
+            <button class="network-action-item" type="button" data-network-action="metadata">Edit network metadata</button>
+            <button class="network-action-item network-action-danger" type="button" data-network-action="archive">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+              </svg>
+              <span>Delete current network</span>
+            </button>
+            <button class="network-action-item" type="button" data-network-action="manage" disabled>Manage networks</button>
+          </div>
+        </div>
       </div>
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -72,8 +93,21 @@
           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
         </svg>
       </button>
-      <span id="account-label" class="account-label"></span>
-      <button id="btn-logout" class="btn btn-ghost">Sign out</button>
+      <div class="account-menu-wrap">
+        <button id="account-menu-trigger" class="btn btn-ghost account-menu-trigger" aria-haspopup="true" aria-expanded="false">
+          <span id="account-label" class="account-label"></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div id="account-menu" class="account-menu hidden">
+          <button class="account-menu-item" type="button" data-account-action="profile" disabled>My profile</button>
+          <button class="account-menu-item" type="button" data-account-action="preferences">Preferences</button>
+          <button class="account-menu-item admin-only" type="button" data-account-action="admin">Account administration</button>
+          <button class="account-menu-item owner-only" type="button" data-account-action="system" disabled>System settings</button>
+          <button class="account-menu-item" type="button" data-account-action="logout">Sign out</button>
+        </div>
+      </div>
       <div id="status-indicator" class="status-dot status-ok" title="Connected"></div>
     </div>
   </header>
@@ -83,57 +117,102 @@
 
     <!-- Left toolbox -->
     <aside id="toolbox">
-      <div class="toolbox-section">
-        <h3 class="toolbox-heading">Navigation</h3>
-        <button class="tool-item" data-tool-action="fit-all">
-          <span class="tool-symbol">Fit</span>
+      <div class="toolbox-header">
+        <span class="toolbox-title">Tools</span>
+      </div>
+      <div class="toolbox-section" data-toolbox-section="navigation">
+        <button class="toolbox-section-toggle" type="button" aria-expanded="true">
+          <span>Navigation</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="tool-item" data-tool-action="fit-all" title="Fit all nodes" aria-label="Fit all nodes">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M21 16v3a2 2 0 0 1-2 2h-3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/></svg></span>
           <span class="tool-label">Fit all nodes</span>
         </button>
-        <button class="tool-item" data-tool-action="fit-selection">
-          <span class="tool-symbol">Sel</span>
+        <button class="tool-item" data-tool-action="fit-selection" title="Fit selection" aria-label="Fit selection">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2" stroke-dasharray="3 2"/><path d="M9 12h6"/><path d="M12 9v6"/></svg></span>
           <span class="tool-label">Fit selection</span>
         </button>
-        <button class="tool-item" data-tool-action="zoom-in">
-          <span class="tool-symbol">+</span>
+        <button class="tool-item" data-tool-action="zoom-in" title="Zoom in" aria-label="Zoom in">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/><path d="M8 11h6"/><path d="M11 8v6"/></svg></span>
           <span class="tool-label">Zoom in</span>
         </button>
-        <button class="tool-item" data-tool-action="zoom-out">
-          <span class="tool-symbol">-</span>
+        <button class="tool-item" data-tool-action="zoom-out" title="Zoom out" aria-label="Zoom out">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/><path d="M8 11h6"/></svg></span>
           <span class="tool-label">Zoom out</span>
         </button>
-        <button class="tool-item" data-tool-action="reset-zoom">
-          <span class="tool-symbol">1:1</span>
+        <button class="tool-item" data-tool-action="reset-zoom" title="Reset zoom" aria-label="Reset zoom">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M20 9A8 8 0 0 0 6 5.3L4 10"/><path d="M4 15a8 8 0 0 0 14 3.7l2-4.7"/></svg></span>
           <span class="tool-label">Reset zoom</span>
         </button>
       </div>
-      <div class="toolbox-section">
-        <h3 class="toolbox-heading">Selection</h3>
-        <button class="tool-item" data-tool-action="select-connected">
-          <span class="tool-symbol">Net</span>
+      <div class="toolbox-section" data-toolbox-section="selection">
+        <button class="toolbox-section-toggle" type="button" aria-expanded="true">
+          <span>Selection</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="tool-item" data-tool-action="select-connected" title="Select connected" aria-label="Select connected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.7 10.8l6.6-3.6"/><path d="M8.7 13.2l6.6 3.6"/></svg></span>
           <span class="tool-label">Select connected</span>
         </button>
-        <button class="tool-item" data-tool-action="clear-selection">
-          <span class="tool-symbol">Esc</span>
+        <button class="tool-item" data-tool-action="select-same-type" title="Select same type" aria-label="Select same type">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><circle cx="7" cy="17" r="3"/><path d="M14 17h6"/><path d="M17 14v6"/></svg></span>
+          <span class="tool-label">Select same type</span>
+        </button>
+        <button class="tool-item" data-tool-action="clear-selection" title="Clear selection" aria-label="Clear selection">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2" stroke-dasharray="3 2"/><path d="M9 9l6 6"/><path d="M15 9l-6 6"/></svg></span>
           <span class="tool-label">Clear selection</span>
         </button>
       </div>
-      <div class="toolbox-section">
-        <h3 class="toolbox-heading">Graph</h3>
-        <button class="tool-item" data-tool-action="hide-selected">
-          <span class="tool-symbol">Hide</span>
+      <div class="toolbox-section" data-toolbox-section="graph">
+        <button class="toolbox-section-toggle" type="button" aria-expanded="true">
+          <span>Graph</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="tool-item" data-tool-action="hide-selected" title="Hide selected" aria-label="Hide selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18"/><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"/><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c5 0 9 4 10 8a11.8 11.8 0 0 1-3.1 5.1"/><path d="M6.1 6.1A11.8 11.8 0 0 0 2 12c1 4 5 8 10 8 1.5 0 2.9-.4 4.1-1"/></svg></span>
           <span class="tool-label">Hide selected</span>
         </button>
-        <button class="tool-item" data-tool-action="show-hidden">
-          <span class="tool-symbol">Show</span>
+        <button class="tool-item" data-tool-action="show-hidden" title="Show hidden" aria-label="Show hidden">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
           <span class="tool-label">Show hidden</span>
         </button>
-        <button class="tool-item" data-tool-action="auto-layout">
-          <span class="tool-symbol">Grid</span>
+        <button class="tool-item" data-tool-action="auto-layout" title="Auto layout" aria-label="Auto layout">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>
           <span class="tool-label">Auto layout</span>
         </button>
+        <button class="tool-item" data-tool-action="lock-selected" title="Lock selected" aria-label="Lock selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+          <span class="tool-label">Lock selected</span>
+        </button>
+        <button class="tool-item" data-tool-action="unlock-selected" title="Unlock selected" aria-label="Unlock selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.3-2"/></svg></span>
+          <span class="tool-label">Unlock selected</span>
+        </button>
       </div>
-      <div class="toolbox-section create-toolbox">
-        <h3 class="toolbox-heading create-heading">Create</h3>
+      <div class="toolbox-section" data-toolbox-section="data">
+        <button class="toolbox-section-toggle" type="button" aria-expanded="true">
+          <span>Data</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="tool-item" data-tool-action="edit-selected" data-requires-selection="true" title="Edit selected" aria-label="Edit selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+          <span class="tool-label">Edit selected</span>
+        </button>
+        <button class="tool-item" data-tool-action="duplicate-selected" disabled title="Duplicate selected" aria-label="Duplicate selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="11" height="11" rx="2"/><rect x="5" y="5" width="11" height="11" rx="2"/></svg></span>
+          <span class="tool-label">Duplicate selected</span>
+        </button>
+        <button class="tool-item danger" data-tool-action="delete-selected" data-requires-selection="true" title="Delete selected" aria-label="Delete selected">
+          <span class="tool-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>
+          <span class="tool-label">Delete selected</span>
+        </button>
+      </div>
+      <div class="toolbox-section create-toolbox" data-toolbox-section="create">
+        <button class="toolbox-section-toggle create-heading" type="button" aria-expanded="true">
+          <span>Create</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
         <h4 class="toolbox-subheading">Persons</h4>
         <div class="tool-icon-grid">
           <button class="tool-icon-button" data-entity="person" data-default-gender="m" draggable="true" title="Male person" aria-label="Create male person">
@@ -230,6 +309,182 @@
 
 </div>
 
+<!-- Preferences modal -->
+<div id="preferences-overlay" class="modal-hidden">
+  <div id="preferences-modal">
+    <div class="modal-header">
+      <h2>Preferences</h2>
+      <button id="preferences-close" class="btn-icon" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <section class="preference-panel">
+        <h3 class="panel-title">Node Colors</h3>
+        <div id="color-preference-list" class="color-preference-list"></div>
+      </section>
+    </div>
+    <div class="modal-footer">
+      <button id="preferences-reset" class="btn btn-ghost" type="button">Reset colors</button>
+      <div class="modal-footer-right">
+        <button id="preferences-cancel" class="btn btn-ghost" type="button">Cancel</button>
+        <button id="preferences-save" class="btn btn-primary" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate person suggestion modal -->
+<div id="duplicate-modal-overlay" class="modal-hidden">
+  <div id="duplicate-modal">
+    <div class="modal-header">
+      <h2>Possible Existing Person</h2>
+      <button id="duplicate-modal-close" class="btn-icon" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="duplicate-intro">Review possible matches before creating a new global person.</p>
+      <div id="duplicate-match-list" class="duplicate-match-list"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-right">
+        <button id="duplicate-create-new" class="btn btn-ghost" type="button">Create new person</button>
+        <button id="duplicate-use-selected" class="btn btn-primary" type="button">Use selected</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared confirmation modal -->
+<div id="confirm-modal-overlay" class="modal-hidden">
+  <div id="confirm-modal">
+    <div class="modal-header">
+      <h2 id="confirm-modal-title">Confirm</h2>
+      <button id="confirm-modal-close" class="btn-icon" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-modal-message" class="confirm-modal-message"></p>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-right">
+        <button id="confirm-modal-cancel" class="btn btn-ghost" type="button">Cancel</button>
+        <button id="confirm-modal-confirm" class="btn btn-danger" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Network administration modal -->
+<div id="network-modal-overlay" class="modal-hidden">
+  <div id="network-modal">
+    <div class="modal-header">
+      <h2 id="network-modal-title">Network</h2>
+      <button id="network-modal-close" class="btn-icon" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="network-modal-message" class="network-modal-message"></div>
+      <div id="network-form-fields">
+        <div class="form-group">
+          <label class="form-label" for="network-modal-name">Name</label>
+          <input id="network-modal-name" class="form-input" type="text" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="network-modal-description">Description</label>
+          <textarea id="network-modal-description" class="form-input" rows="3"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="network-modal-danger" class="btn btn-danger" type="button" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+        </svg>
+        <span>Delete</span>
+      </button>
+      <div class="modal-footer-right">
+        <button id="network-modal-cancel" class="btn btn-ghost" type="button">Cancel</button>
+        <button id="network-modal-save" class="btn btn-primary" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Account administration modal -->
+<div id="account-admin-overlay" class="modal-hidden">
+  <div id="account-admin-modal">
+    <div class="modal-header">
+      <h2>Account Administration</h2>
+      <button id="account-admin-close" class="btn-icon" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body account-admin-body">
+      <section class="account-panel">
+        <h3 class="panel-title">Create Account</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="account-create-email">Account name</label>
+            <input id="account-create-email" class="form-input" type="text" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="account-create-display">Display name</label>
+            <input id="account-create-display" class="form-input" type="text" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="account-create-password">Password</label>
+            <input id="account-create-password" class="form-input" type="password" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="account-create-role">Role</label>
+            <select id="account-create-role" class="form-select"></select>
+          </div>
+        </div>
+        <div class="account-admin-actions">
+          <button id="account-create-submit" class="btn btn-primary" type="button">Create</button>
+        </div>
+      </section>
+
+      <section class="account-panel">
+        <div class="account-list-header">
+          <h3 class="panel-title">Accounts</h3>
+          <button id="account-refresh" class="btn btn-ghost" type="button">Refresh</button>
+        </div>
+        <div id="account-admin-message" class="account-admin-message"></div>
+        <div class="account-table-wrap">
+          <table class="account-table">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="account-list-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
 <!-- Node creation / edit modal -->
 <div id="modal-overlay" class="modal-hidden">
   <div id="modal">
@@ -243,7 +498,12 @@
     </div>
     <form id="modal-form" class="modal-body"></form>
     <div class="modal-footer">
-      <button id="modal-delete" class="btn btn-danger" style="display:none">Archive</button>
+      <button id="modal-delete" class="btn btn-danger" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+        </svg>
+        <span>Delete</span>
+      </button>
       <div class="modal-footer-right">
         <button id="modal-cancel" class="btn btn-ghost">Cancel</button>
         <button id="modal-save" class="btn btn-primary">Save</button>
@@ -256,7 +516,7 @@
 <div id="link-modal-overlay" class="modal-hidden">
   <div id="link-modal">
     <div class="modal-header">
-      <h2>Create Relationship</h2>
+      <h2 id="link-modal-title">Create Relationship</h2>
       <button id="link-modal-close" class="btn-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -280,11 +540,11 @@
       <div id="link-dates-group" class="form-row" style="display:none">
         <div class="form-group">
           <label class="form-label" for="link-start">Start</label>
-          <input id="link-start" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+          <input id="link-start" class="form-input date-input" type="text" inputmode="numeric" pattern="[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?" placeholder="YYYY, YYYY-MM, or YYYY-MM-DD" />
         </div>
         <div class="form-group">
           <label class="form-label" for="link-end">End</label>
-          <input id="link-end" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+          <input id="link-end" class="form-input date-input" type="text" inputmode="numeric" pattern="[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?" placeholder="YYYY, YYYY-MM, or YYYY-MM-DD" />
         </div>
       </div>
       <div id="link-current-group" class="form-group" style="display:none">
@@ -299,6 +559,12 @@
       </div>
     </div>
     <div class="modal-footer">
+      <button id="link-modal-delete" class="btn btn-danger" type="button" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+        </svg>
+        <span>Delete</span>
+      </button>
       <div class="modal-footer-right">
         <button id="link-modal-cancel" class="btn btn-ghost">Cancel</button>
         <button id="link-modal-save" class="btn btn-primary">Create</button>
@@ -343,11 +609,11 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="attribute-start">Start</label>
-        <input id="attribute-start" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+        <input id="attribute-start" class="form-input date-input" type="text" inputmode="numeric" pattern="[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?" placeholder="YYYY, YYYY-MM, or YYYY-MM-DD" />
       </div>
       <div class="form-group">
         <label class="form-label" for="attribute-end">End</label>
-        <input id="attribute-end" class="form-input" type="text" placeholder="YYYY or YYYY-MM-DD" />
+        <input id="attribute-end" class="form-input date-input" type="text" inputmode="numeric" pattern="[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?" placeholder="YYYY, YYYY-MM, or YYYY-MM-DD" />
       </div>
       <div class="form-group">
         <label class="form-check">

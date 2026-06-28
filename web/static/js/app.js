@@ -32,12 +32,17 @@ function isTemporaryApiError(err) {
   return err && /^(404|501)\b/.test(err.message || '');
 }
 
-function isArchiveAction(entityType) {
-  return entityType === 'project' || isOrganizationEntityType(entityType) || (entityType === 'person' && window.currentNetworkId);
+function destructiveActionLabel(entityType) {
+  return 'Delete';
 }
 
-function destructiveActionLabel(entityType) {
-  return isArchiveAction(entityType) ? 'Archive' : 'Delete';
+function trashIconMarkup() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+}
+
+function setDeleteButton(button, label) {
+  if (!button) return;
+  button.innerHTML = `${trashIconMarkup()}<span>${label || 'Delete'}</span>`;
 }
 
 function createTemporaryEntity(entityType, data) {
@@ -76,15 +81,46 @@ let currentAccount = null;
 let currentNetwork = null;
 let ownedNetworks = [];
 let currentCustomRelationshipTypes = [];
+let pendingDisableAccountId = null;
+let networkModalMode = 'create';
+let pendingNetworkArchive = false;
+let confirmDialogResolve = null;
+let duplicateDialogResolve = null;
+let duplicateSelectedPersonId = null;
+let duplicateMatches = [];
+let activeContextMenu = null;
+let lastLoadedNetworkId = null;
 window.currentNetworkId = null;
+
+const ACCOUNT_ROLES = [
+  ['owner', 'Owner'],
+  ['admin', 'Admin'],
+  ['editor', 'Editor'],
+  ['viewer', 'Viewer'],
+];
+
+const COLOR_PREFERENCES = [
+  ['--node-person-male', 'Male person', '#3b82f6'],
+  ['--node-person-female', 'Female person', '#ec4899'],
+  ['--node-person-other', 'Other person', '#64748b'],
+  ['--node-company', 'Company', '#10b981'],
+  ['--node-association', 'Association', '#f59e0b'],
+  ['--node-school', 'School', '#ef4444'],
+  ['--node-government', 'Government', '#6366f1'],
+  ['--node-project', 'Project', '#22c55e'],
+];
 
 async function boot() {
   currentAccount = await requireAccount();
   if (!currentAccount) return;
+  applyStoredColorPreferences();
 
   await initNetworks();
   initToolbox();
   initInspector();
+  initConfirmDialog();
+  initDuplicateDialog();
+  initContextMenus();
   initModals();
   initLinkModal();
   initAttributeModal();
@@ -116,13 +152,17 @@ async function boot() {
 }
 
 async function loadGraph() {
+  const networkId = window.currentNetworkId;
+  const networkChanged = networkId !== lastLoadedNetworkId;
   setStatus('loading');
   try {
-    if (!window.currentNetworkId) {
+    if (!networkId) {
       currentCustomRelationshipTypes = [];
       graph.clear();
       renderAllNodes();
       renderAllLinks();
+      if (networkChanged || !canvas.hasUserViewport()) canvas.resetZoom({ user: false });
+      lastLoadedNetworkId = networkId;
       setStatus('ok');
       return;
     }
@@ -131,6 +171,8 @@ async function loadGraph() {
     graph.load(data);
     renderAllNodes();
     renderAllLinks();
+    frameLoadedGraph(networkChanged);
+    lastLoadedNetworkId = networkId;
     setStatus('ok');
   } catch (err) {
     console.error('Failed to load graph:', err);
@@ -138,12 +180,26 @@ async function loadGraph() {
   }
 }
 
+function frameLoadedGraph(networkChanged) {
+  const visible = graph.nodes.filter(node => !graph.isNodeHidden(node.id));
+  if (!networkChanged && canvas.hasUserViewport()) return;
+  if (!visible.length) {
+    canvas.resetZoom({ user: false });
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    canvas.fitToNodes(visible, { user: false });
+  });
+}
+
 async function initNetworks() {
   const select = el('network-select');
   const createBtn = el('btn-new-network');
   const renameBtn = el('btn-rename-network');
-  createBtn.addEventListener('click', handleCreateNetwork);
-  renameBtn.addEventListener('click', handleRenameNetwork);
+  createBtn.addEventListener('click', () => openNetworkModal('create'));
+  renameBtn.addEventListener('click', () => openNetworkModal('rename'));
+  initNetworkActionsMenu();
+  initNetworkModal();
   select.addEventListener('change', async () => {
     const selected = ownedNetworks.find(n => n.id === select.value);
     setCurrentNetwork(selected || null);
@@ -151,6 +207,171 @@ async function initNetworks() {
   });
   initNetworkSearch();
   await refreshNetworks();
+}
+
+function initNetworkActionsMenu() {
+  const trigger = el('btn-network-actions');
+  const menu = el('network-actions-menu');
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !open);
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    updateNetworkActions();
+  });
+
+  menu.addEventListener('click', (event) => {
+    const action = event.target && event.target.dataset ? event.target.dataset.networkAction : '';
+    if (!action || event.target.disabled) return;
+    menu.classList.add('hidden');
+    trigger.setAttribute('aria-expanded', 'false');
+    if (action === 'create') openNetworkModal('create');
+    if (action === 'rename') openNetworkModal('rename');
+    if (action === 'metadata') openNetworkModal('metadata');
+    if (action === 'archive') openNetworkModal('archive');
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!menu.classList.contains('hidden') && !menu.contains(event.target) && event.target !== trigger) {
+      menu.classList.add('hidden');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+function initNetworkModal() {
+  const overlay = el('network-modal-overlay');
+  if (!overlay) return;
+  el('network-modal-close').addEventListener('click', closeNetworkModal);
+  el('network-modal-cancel').addEventListener('click', closeNetworkModal);
+  el('network-modal-save').addEventListener('click', handleNetworkModalSave);
+  el('network-modal-danger').addEventListener('click', handleNetworkModalArchive);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closeNetworkModal();
+  });
+}
+
+function openNetworkModal(mode) {
+  if (currentAccount && currentAccount.role === 'viewer') return;
+  if ((mode === 'rename' || mode === 'metadata' || mode === 'archive') && !currentNetwork) return;
+
+  networkModalMode = mode;
+  pendingNetworkArchive = false;
+  const overlay = el('network-modal-overlay');
+  const title = el('network-modal-title');
+  const name = el('network-modal-name');
+  const description = el('network-modal-description');
+  const save = el('network-modal-save');
+  const danger = el('network-modal-danger');
+  const fields = el('network-form-fields');
+
+  setNetworkModalMessage('');
+  danger.style.display = 'none';
+  save.style.display = '';
+  fields.style.display = '';
+  name.disabled = false;
+  description.disabled = false;
+
+  if (mode === 'create') {
+    title.textContent = 'Create Network';
+    name.value = '';
+    description.value = '';
+    save.textContent = 'Create';
+  } else if (mode === 'archive') {
+    title.textContent = 'Delete Network';
+    name.value = currentNetwork.name || '';
+    description.value = currentNetwork.description || '';
+    name.disabled = true;
+    description.disabled = true;
+    save.style.display = 'none';
+    danger.style.display = '';
+    setDeleteButton(danger, 'Delete');
+    setNetworkModalMessage('Deleting a network hides it from your network list. Global person identities are not deleted.', 'error');
+  } else {
+    title.textContent = mode === 'metadata' ? 'Edit Network Metadata' : 'Rename Network';
+    name.value = currentNetwork.name || '';
+    description.value = currentNetwork.description || '';
+    save.textContent = 'Save';
+  }
+
+  overlay.classList.remove('modal-hidden');
+  if (mode !== 'archive') name.focus();
+}
+
+function closeNetworkModal() {
+  el('network-modal-overlay').classList.add('modal-hidden');
+  pendingNetworkArchive = false;
+}
+
+function setNetworkModalMessage(message, type) {
+  const box = el('network-modal-message');
+  if (!box) return;
+  box.textContent = message || '';
+  box.classList.toggle('is-error', type === 'error');
+  box.classList.toggle('is-success', type === 'success');
+}
+
+async function handleNetworkModalSave() {
+  const name = el('network-modal-name').value.trim();
+  const description = el('network-modal-description').value.trim();
+  if (!name) {
+    setNetworkModalMessage('Network name is required.', 'error');
+    el('network-modal-name').focus();
+    return;
+  }
+
+  el('network-modal-save').disabled = true;
+  try {
+    if (networkModalMode === 'create') {
+      const network = await apiCreateNetwork({ name, description });
+      ownedNetworks = await apiListNetworks();
+      renderNetworkOptions(ownedNetworks, network.id);
+      setCurrentNetwork(network);
+      graph.selectNode(null);
+      await loadGraph();
+      closeNetworkModal();
+      return;
+    }
+
+    if (!currentNetwork) return;
+    const updated = await apiUpdateNetwork(currentNetwork.id, { name, description });
+    ownedNetworks = ownedNetworks.map(network => network.id === updated.id ? updated : network);
+    renderNetworkOptions(ownedNetworks, updated.id);
+    setCurrentNetwork(updated);
+    closeNetworkModal();
+  } catch (err) {
+    console.error('Network save failed:', err);
+    setNetworkModalMessage('Could not save network.', 'error');
+  } finally {
+    el('network-modal-save').disabled = false;
+  }
+}
+
+async function handleNetworkModalArchive() {
+  if (!currentNetwork) return;
+  if (!pendingNetworkArchive) {
+    pendingNetworkArchive = true;
+    setDeleteButton(el('network-modal-danger'), 'Confirm delete');
+    setNetworkModalMessage(`Click Confirm delete to delete "${currentNetwork.name}". Global person identities will remain.`, 'error');
+    return;
+  }
+
+  el('network-modal-danger').disabled = true;
+  try {
+    await apiArchiveNetwork(currentNetwork.id);
+    window.localStorage.removeItem('mate.currentNetworkId');
+    await refreshNetworks();
+    graph.selectNode(null);
+    await loadGraph();
+    closeNetworkModal();
+  } catch (err) {
+    console.error('Network archive failed:', err);
+    setNetworkModalMessage('Could not delete network.', 'error');
+  } finally {
+    el('network-modal-danger').disabled = false;
+  }
 }
 
 async function refreshNetworks() {
@@ -168,9 +389,17 @@ async function refreshNetworks() {
 function updateNetworkActions() {
   const createBtn = el('btn-new-network');
   const renameBtn = el('btn-rename-network');
+  const actionsBtn = el('btn-network-actions');
   const canWrite = currentAccount && currentAccount.role !== 'viewer';
   if (createBtn) createBtn.disabled = !canWrite;
   if (renameBtn) renameBtn.disabled = !canWrite || !currentNetwork;
+  if (actionsBtn) actionsBtn.disabled = !canWrite;
+  qsa('[data-network-action]').forEach(item => {
+    const action = item.dataset.networkAction;
+    const needsCurrent = action === 'rename' || action === 'metadata' || action === 'archive';
+    if (action === 'manage') return;
+    item.disabled = !canWrite || (needsCurrent && !currentNetwork);
+  });
 }
 
 function renderNetworkOptions(networks, selectedID) {
@@ -203,41 +432,6 @@ function setCurrentNetwork(network) {
     window.localStorage.removeItem('mate.currentNetworkId');
   }
   updateNetworkActions();
-}
-
-async function handleCreateNetwork() {
-  if (currentAccount && currentAccount.role === 'viewer') return;
-  const name = prompt('Network name');
-  if (!name || !name.trim()) return;
-  try {
-    const network = await apiCreateNetwork({ name: name.trim() });
-    ownedNetworks = await apiListNetworks();
-    renderNetworkOptions(ownedNetworks, network.id);
-    setCurrentNetwork(network);
-    graph.selectNode(null);
-    await loadGraph();
-  } catch (err) {
-    console.error('Network create failed:', err);
-    alert('Could not create network.');
-  }
-}
-
-async function handleRenameNetwork() {
-  if (!currentNetwork || (currentAccount && currentAccount.role === 'viewer')) return;
-  const name = prompt('Network name', currentNetwork.name || '');
-  if (!name || !name.trim() || name.trim() === currentNetwork.name) return;
-  try {
-    const updated = await apiUpdateNetwork(currentNetwork.id, {
-      name: name.trim(),
-      description: currentNetwork.description || '',
-    });
-    ownedNetworks = ownedNetworks.map(network => network.id === updated.id ? updated : network);
-    renderNetworkOptions(ownedNetworks, updated.id);
-    setCurrentNetwork(updated);
-  } catch (err) {
-    console.error('Network rename failed:', err);
-    alert('Could not rename network.');
-  }
 }
 
 function initNetworkSearch() {
@@ -326,6 +520,138 @@ function setStatus(state) {
   dot.classList.add('status-dot', `status-${state}`);
 }
 
+function initConfirmDialog() {
+  el('confirm-modal-close').addEventListener('click', () => closeConfirmDialog(false));
+  el('confirm-modal-cancel').addEventListener('click', () => closeConfirmDialog(false));
+  el('confirm-modal-confirm').addEventListener('click', () => closeConfirmDialog(true));
+  el('confirm-modal-overlay').addEventListener('click', (event) => {
+    if (event.target === el('confirm-modal-overlay')) closeConfirmDialog(false);
+  });
+}
+
+function openConfirmDialog(options) {
+  const overlay = el('confirm-modal-overlay');
+  const confirmButton = el('confirm-modal-confirm');
+  const cancelButton = el('confirm-modal-cancel');
+  el('confirm-modal-title').textContent = options.title || 'Confirm';
+  el('confirm-modal-message').textContent = options.message || '';
+  const confirmLabel = options.confirmLabel || 'Confirm';
+  if (confirmLabel.toLowerCase().includes('delete')) {
+    setDeleteButton(confirmButton, confirmLabel);
+  } else {
+    confirmButton.textContent = confirmLabel;
+  }
+  cancelButton.textContent = options.cancelLabel || 'Cancel';
+  cancelButton.style.display = options.showCancel === false ? 'none' : '';
+  confirmButton.classList.toggle('btn-danger', options.danger !== false);
+  confirmButton.classList.toggle('btn-primary', options.danger === false);
+  overlay.classList.remove('modal-hidden');
+  confirmButton.focus();
+  return new Promise(resolve => {
+    confirmDialogResolve = resolve;
+  });
+}
+
+function closeConfirmDialog(result) {
+  const overlay = el('confirm-modal-overlay');
+  overlay.classList.add('modal-hidden');
+  if (confirmDialogResolve) {
+    const resolve = confirmDialogResolve;
+    confirmDialogResolve = null;
+    resolve(Boolean(result));
+  }
+}
+
+async function openMessageDialog(title, message) {
+  await openConfirmDialog({
+    title,
+    message,
+    confirmLabel: 'OK',
+    danger: false,
+    showCancel: false,
+  });
+}
+
+function initDuplicateDialog() {
+  el('duplicate-modal-close').addEventListener('click', () => closeDuplicateDialog({ cancelled: true }));
+  el('duplicate-create-new').addEventListener('click', () => closeDuplicateDialog({ createNew: true }));
+  el('duplicate-use-selected').addEventListener('click', () => {
+    const match = duplicateMatches.find(item => item.person && item.person.id === duplicateSelectedPersonId);
+    closeDuplicateDialog(match ? { person: match.person } : { cancelled: true });
+  });
+  el('duplicate-modal-overlay').addEventListener('click', (event) => {
+    if (event.target === el('duplicate-modal-overlay')) closeDuplicateDialog({ cancelled: true });
+  });
+}
+
+function openDuplicateDialog(matches) {
+  duplicateMatches = matches || [];
+  duplicateSelectedPersonId = duplicateMatches[0] && duplicateMatches[0].person ? duplicateMatches[0].person.id : null;
+  renderDuplicateMatches();
+  el('duplicate-use-selected').disabled = !duplicateSelectedPersonId;
+  el('duplicate-modal-overlay').classList.remove('modal-hidden');
+  el('duplicate-use-selected').focus();
+  return new Promise(resolve => {
+    duplicateDialogResolve = resolve;
+  });
+}
+
+function closeDuplicateDialog(result) {
+  el('duplicate-modal-overlay').classList.add('modal-hidden');
+  duplicateMatches = [];
+  duplicateSelectedPersonId = null;
+  if (duplicateDialogResolve) {
+    const resolve = duplicateDialogResolve;
+    duplicateDialogResolve = null;
+    resolve(result || { cancelled: true });
+  }
+}
+
+function renderDuplicateMatches() {
+  const list = el('duplicate-match-list');
+  clearChildren(list);
+  duplicateMatches.forEach(match => {
+    const person = match.person || {};
+    const card = createEl('button', 'duplicate-match-card', { type: 'button' });
+    card.classList.toggle('selected', person.id === duplicateSelectedPersonId);
+    card.addEventListener('click', () => {
+      duplicateSelectedPersonId = person.id;
+      el('duplicate-use-selected').disabled = !duplicateSelectedPersonId;
+      renderDuplicateMatches();
+    });
+
+    const head = createEl('div', 'duplicate-match-head');
+    const name = createEl('div', 'duplicate-match-name', { text: person.name || person.nickname || 'Unnamed person' });
+    const confidence = createEl('div', 'duplicate-match-confidence', { text: `${Math.round((match.confidence || 0) * 100)}% match` });
+    head.appendChild(name);
+    head.appendChild(confidence);
+    card.appendChild(head);
+
+    const meta = createEl('div', 'duplicate-match-meta');
+    [
+      ['Nickname', person.nickname],
+      ['Gender', person.gender],
+      ['Title', person.title],
+      ['Status', person.deceased ? 'Deceased' : ''],
+      ['Tags', (person.tags || []).join(', ')],
+      ['ID', person.id],
+    ].forEach(([label, value]) => {
+      if (!value) return;
+      meta.appendChild(createEl('span', '', { text: `${label}: ${value}` }));
+    });
+    if (meta.children.length) card.appendChild(meta);
+
+    if (person.description) {
+      card.appendChild(createEl('div', 'duplicate-match-description', { text: person.description }));
+    }
+    const reasons = (match.reasons || []).join(', ');
+    if (reasons) {
+      card.appendChild(createEl('div', 'duplicate-match-reasons', { text: `Reasons: ${reasons}` }));
+    }
+    list.appendChild(card);
+  });
+}
+
 
 async function requireAccount() {
   try {
@@ -348,8 +674,133 @@ function renderCurrentAccount() {
   label.title = currentAccount.role ? `${currentAccount.email} (${currentAccount.role})` : currentAccount.email;
 }
 
+function initContextMenus() {
+  el('workspace').addEventListener('contextmenu', (event) => {
+    if (event.target.closest('.graph-node') || event.target.closest('[data-link-group]')) return;
+    event.preventDefault();
+    openCanvasContextMenu(event.clientX, event.clientY);
+  });
+
+  document.addEventListener('click', closeContextMenu);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeContextMenu();
+  });
+}
+
+function openContextMenu(items, x, y) {
+  closeContextMenu();
+  const menu = createEl('div', 'context-menu');
+  items.forEach(item => {
+    if (item.separator) {
+      menu.appendChild(createEl('div', 'context-menu-separator'));
+      return;
+    }
+    const button = createEl('button', 'context-menu-item', { type: 'button' });
+    if (item.icon === 'trash') {
+      button.innerHTML = `${trashIconMarkup()}<span>${item.label}</span>`;
+    } else {
+      button.textContent = item.label;
+    }
+    button.disabled = Boolean(item.disabled);
+    button.classList.toggle('danger', Boolean(item.danger));
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      closeContextMenu();
+      if (!item.disabled && item.action) await item.action();
+    });
+    menu.appendChild(button);
+  });
+  document.body.appendChild(menu);
+
+  const rect = menu.getBoundingClientRect();
+  const left = Math.min(x, window.innerWidth - rect.width - 8);
+  const top = Math.min(y, window.innerHeight - rect.height - 8);
+  menu.style.left = Math.max(8, left) + 'px';
+  menu.style.top = Math.max(8, top) + 'px';
+  activeContextMenu = menu;
+}
+
+function closeContextMenu() {
+  if (activeContextMenu) {
+    activeContextMenu.remove();
+    activeContextMenu = null;
+  }
+}
+
+function openNodeContextMenu(nodeId, x, y) {
+  const node = graph.getNode(nodeId);
+  if (!node) return;
+  graph.selectNode(nodeId);
+  const action = destructiveActionLabel(node.entityType);
+  const locked = graph.isNodeLocked(nodeId);
+  openContextMenu([
+    { label: 'Edit', action: () => openEditModal(nodeId) },
+    { label: 'Create relationship from node', action: () => graph.setLinkSource(nodeId) },
+    { label: 'Fit selection', action: () => canvas.fitToNodes([node]) },
+    { label: 'Select same type', action: () => selectSameNodeType(nodeId) },
+    { separator: true },
+    { label: 'Hide', action: () => graph.hideNodes([nodeId]) },
+    { label: 'Duplicate', disabled: true },
+    { label: 'Lock', disabled: locked, action: () => graph.lockNodes([nodeId]) },
+    { label: 'Unlock', disabled: !locked, action: () => graph.unlockNodes([nodeId]) },
+    { separator: true },
+    { label: action, icon: 'trash', danger: true, action: () => deleteNodeWithDialog(nodeId) },
+  ], x, y);
+}
+
+function openRelationshipContextMenu(linkId, x, y) {
+  const link = graph.getLink(linkId);
+  if (!link) return;
+  const source = graph.getNode(link.sourceId);
+  const target = graph.getNode(link.targetId);
+  openContextMenu([
+    { label: 'Edit relationship', action: () => openRelationshipEditModal(linkId) },
+    { label: 'Select connected nodes', action: () => {
+      graph.selectNodes([link.sourceId, link.targetId]);
+      canvas.fitToNodes([source, target].filter(Boolean));
+    } },
+    { label: 'Show connected nodes', action: () => {
+      graph.selectNodes([link.sourceId, link.targetId]);
+      canvas.fitToNodes([source, target].filter(Boolean));
+    } },
+    { separator: true },
+    { label: 'Delete relationship', icon: 'trash', danger: true, action: () => promptDeleteLink(linkId) },
+  ], x, y);
+}
+
+function openCanvasContextMenu(x, y) {
+  const pos = canvas.screenToWorld(x, y);
+  openContextMenu([
+    { label: 'Create person here', action: () => openAddModal('person', pos.x, pos.y) },
+    { label: 'Create organization here', disabled: true },
+    { label: 'Paste', disabled: true },
+    { separator: true },
+    { label: 'Fit all nodes', action: () => canvas.fitToNodes(graph.nodes.filter(node => !graph.isNodeHidden(node.id))) },
+    { label: 'Reset zoom', action: () => canvas.resetZoom() },
+    { label: 'Show hidden', action: () => graph.showHiddenNodes() },
+    { label: 'Clear selection', action: () => graph.selectNode(null) },
+  ], x, y);
+}
+
+function canOpenAccountAdmin() {
+  return currentAccount && ['owner', 'admin'].includes(currentAccount.role);
+}
+
+function accountRoleOptionsForActor() {
+  if (currentAccount && currentAccount.role === 'owner') return ACCOUNT_ROLES;
+  return ACCOUNT_ROLES.filter(([role]) => role === 'editor' || role === 'viewer');
+}
+
+function canActorManageAccount(account) {
+  if (!currentAccount || !account) return false;
+  if (currentAccount.role === 'owner') return true;
+  if (currentAccount.role === 'admin') return account.role === 'editor' || account.role === 'viewer';
+  return false;
+}
+
 async function handleLogout() {
-  el('btn-logout').disabled = true;
+  const trigger = el('account-menu-trigger');
+  if (trigger) trigger.disabled = true;
   try {
     await apiLogout();
   } catch (err) {
@@ -363,7 +814,9 @@ async function handleLogout() {
 
 function initHeaderButtons() {
   renderCurrentAccount();
-  el('btn-logout').addEventListener('click', handleLogout);
+  initAccountMenu();
+  initAccountAdmin();
+  initPreferencesModal();
 
   el('btn-fit').addEventListener('click', () => {
     canvas.fitToNodes(graph.nodes);
@@ -373,6 +826,319 @@ function initHeaderButtons() {
     graph.selectNode(null);
     await loadGraph();
   });
+}
+
+function initAccountMenu() {
+  const trigger = el('account-menu-trigger');
+  const menu = el('account-menu');
+  if (!trigger || !menu) return;
+
+  qsa('.admin-only', menu).forEach(item => item.classList.toggle('hidden', !canOpenAccountAdmin()));
+  qsa('.owner-only', menu).forEach(item => item.classList.toggle('hidden', !currentAccount || currentAccount.role !== 'owner'));
+
+  trigger.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !open);
+    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  menu.addEventListener('click', async (event) => {
+    const action = event.target && event.target.dataset ? event.target.dataset.accountAction : '';
+    if (!action) return;
+    menu.classList.add('hidden');
+    trigger.setAttribute('aria-expanded', 'false');
+    if (action === 'logout') {
+      await handleLogout();
+    } else if (action === 'admin') {
+      openAccountAdmin();
+    } else if (action === 'preferences') {
+      openPreferencesModal();
+    } else if (action === 'profile' || action === 'system') {
+      setAccountAdminMessage('This area is planned for a later 0.13 step.', 'success');
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!menu.classList.contains('hidden') && !menu.contains(event.target) && event.target !== trigger) {
+      menu.classList.add('hidden');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+function colorPreferenceStorageKey() {
+  const accountKey = currentAccount && (currentAccount.id || currentAccount.email || currentAccount.display_name);
+  return `mate.colorPreferences.${accountKey || 'default'}`;
+}
+
+function storedColorPreferences() {
+  try {
+    return JSON.parse(window.localStorage.getItem(colorPreferenceStorageKey()) || '{}');
+  } catch (err) {
+    console.warn('Could not parse color preferences:', err.message);
+    return {};
+  }
+}
+
+function applyColorPreferences(values) {
+  const root = document.documentElement;
+  COLOR_PREFERENCES.forEach(([variable, , fallback]) => {
+    root.style.setProperty(variable, values && values[variable] ? values[variable] : fallback);
+  });
+  renderAllNodes();
+}
+
+function applyStoredColorPreferences() {
+  applyColorPreferences(storedColorPreferences());
+}
+
+function initPreferencesModal() {
+  const overlay = el('preferences-overlay');
+  if (!overlay) return;
+  el('preferences-close').addEventListener('click', closePreferencesModal);
+  el('preferences-cancel').addEventListener('click', closePreferencesModal);
+  el('preferences-save').addEventListener('click', savePreferencesModal);
+  el('preferences-reset').addEventListener('click', resetPreferencesModal);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closePreferencesModal();
+  });
+}
+
+function openPreferencesModal() {
+  const list = el('color-preference-list');
+  clearChildren(list);
+  const stored = storedColorPreferences();
+  COLOR_PREFERENCES.forEach(([variable, label, fallback]) => {
+    const row = createEl('div', 'color-preference-row');
+    const labelWrap = createEl('label', 'color-preference-label');
+    const swatch = createEl('span', 'color-preference-swatch');
+    const text = createEl('span', '');
+    const input = createEl('input', 'color-preference-input');
+    const value = stored[variable] || fallback;
+    input.type = 'color';
+    input.value = value;
+    input.dataset.colorVariable = variable;
+    swatch.style.setProperty('--swatch-color', value);
+    text.textContent = label;
+    input.addEventListener('input', () => {
+      swatch.style.setProperty('--swatch-color', input.value);
+    });
+    labelWrap.appendChild(swatch);
+    labelWrap.appendChild(text);
+    row.appendChild(labelWrap);
+    row.appendChild(input);
+    list.appendChild(row);
+  });
+  el('preferences-overlay').classList.remove('modal-hidden');
+}
+
+function closePreferencesModal() {
+  el('preferences-overlay').classList.add('modal-hidden');
+}
+
+function savePreferencesModal() {
+  const values = {};
+  qsa('[data-color-variable]', el('color-preference-list')).forEach(input => {
+    values[input.dataset.colorVariable] = input.value;
+  });
+  window.localStorage.setItem(colorPreferenceStorageKey(), JSON.stringify(values));
+  applyColorPreferences(values);
+  closePreferencesModal();
+}
+
+function resetPreferencesModal() {
+  window.localStorage.removeItem(colorPreferenceStorageKey());
+  applyColorPreferences({});
+  openPreferencesModal();
+}
+
+function initAccountAdmin() {
+  const overlay = el('account-admin-overlay');
+  if (!overlay) return;
+  el('account-admin-close').addEventListener('click', closeAccountAdmin);
+  el('account-refresh').addEventListener('click', refreshAccountAdmin);
+  el('account-create-submit').addEventListener('click', handleAccountCreate);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closeAccountAdmin();
+  });
+  renderAccountCreateRoles();
+}
+
+function openAccountAdmin() {
+  if (!canOpenAccountAdmin()) return;
+  pendingDisableAccountId = null;
+  renderAccountCreateRoles();
+  setAccountAdminMessage('');
+  el('account-admin-overlay').classList.remove('modal-hidden');
+  refreshAccountAdmin();
+}
+
+function closeAccountAdmin() {
+  el('account-admin-overlay').classList.add('modal-hidden');
+  pendingDisableAccountId = null;
+}
+
+function renderAccountCreateRoles() {
+  const select = el('account-create-role');
+  if (!select) return;
+  clearChildren(select);
+  accountRoleOptionsForActor().forEach(([value, label]) => {
+    const option = createEl('option', '');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  if (!select.value) select.value = 'viewer';
+}
+
+function setAccountAdminMessage(message, type) {
+  const box = el('account-admin-message');
+  if (!box) return;
+  box.textContent = message || '';
+  box.classList.toggle('is-error', type === 'error');
+  box.classList.toggle('is-success', type === 'success');
+}
+
+async function refreshAccountAdmin() {
+  if (!canOpenAccountAdmin()) return;
+  const body = el('account-list-body');
+  clearChildren(body);
+  const row = createEl('tr');
+  const cell = createEl('td', '', { text: 'Loading accounts...' });
+  cell.colSpan = 4;
+  row.appendChild(cell);
+  body.appendChild(row);
+
+  try {
+    const accounts = await apiListAccounts();
+    renderAccountRows(accounts || []);
+    setAccountAdminMessage(accounts && accounts.length ? '' : 'No accounts found.');
+  } catch (err) {
+    clearChildren(body);
+    setAccountAdminMessage('Could not load accounts.', 'error');
+    console.error('Account list failed:', err);
+  }
+}
+
+function renderAccountRows(accounts) {
+  const body = el('account-list-body');
+  clearChildren(body);
+  accounts.forEach(account => {
+    const row = createEl('tr');
+    row.appendChild(accountNameCell(account));
+    row.appendChild(accountRoleCell(account));
+    row.appendChild(accountStatusCell(account));
+    row.appendChild(accountActionsCell(account));
+    body.appendChild(row);
+  });
+}
+
+function accountNameCell(account) {
+  const cell = createEl('td');
+  const wrap = createEl('div', 'account-name-cell');
+  wrap.appendChild(createEl('span', 'account-display-name', { text: account.display_name || account.email }));
+  wrap.appendChild(createEl('span', 'account-email', { text: account.email }));
+  cell.appendChild(wrap);
+  return cell;
+}
+
+function accountRoleCell(account) {
+  const cell = createEl('td');
+  const select = createEl('select', 'form-select');
+  accountRoleOptionsForActor().forEach(([value, label]) => {
+    const option = createEl('option', '');
+    option.value = value;
+    option.textContent = label;
+    option.selected = account.role === value;
+    select.appendChild(option);
+  });
+  if (!Array.from(select.options).some(option => option.value === account.role)) {
+    const option = createEl('option', '');
+    option.value = account.role;
+    option.textContent = account.role;
+    option.selected = true;
+    select.appendChild(option);
+  }
+  select.disabled = account.disabled || !canActorManageAccount(account);
+  select.addEventListener('change', async () => {
+    try {
+      const updated = await apiUpdateAccountRole(account.id, select.value);
+      setAccountAdminMessage(`Updated ${updated.email}.`, 'success');
+      await refreshAccountAdmin();
+    } catch (err) {
+      setAccountAdminMessage('Could not update role.', 'error');
+      console.error('Account role update failed:', err);
+      await refreshAccountAdmin();
+    }
+  });
+  cell.appendChild(select);
+  return cell;
+}
+
+function accountStatusCell(account) {
+  const cell = createEl('td');
+  const status = createEl('span', 'account-status', { text: account.disabled ? 'Disabled' : 'Active' });
+  status.classList.toggle('disabled', Boolean(account.disabled));
+  cell.appendChild(status);
+  return cell;
+}
+
+function accountActionsCell(account) {
+  const cell = createEl('td');
+  const wrap = createEl('div', 'account-row-actions');
+  const disable = createEl('button', 'btn btn-danger', { type: 'button' });
+  disable.textContent = pendingDisableAccountId === account.id ? 'Confirm' : 'Disable';
+  disable.disabled = account.disabled || account.id === currentAccount.id || !canActorManageAccount(account);
+  disable.addEventListener('click', async () => {
+    if (pendingDisableAccountId !== account.id) {
+      pendingDisableAccountId = account.id;
+      setAccountAdminMessage(`Click Confirm to disable ${account.email}.`, 'error');
+      await refreshAccountAdmin();
+      return;
+    }
+    try {
+      const updated = await apiDisableAccount(account.id);
+      pendingDisableAccountId = null;
+      setAccountAdminMessage(`Disabled ${updated.email}.`, 'success');
+      await refreshAccountAdmin();
+    } catch (err) {
+      pendingDisableAccountId = null;
+      setAccountAdminMessage('Could not disable account.', 'error');
+      console.error('Account disable failed:', err);
+      await refreshAccountAdmin();
+    }
+  });
+  wrap.appendChild(disable);
+  cell.appendChild(wrap);
+  return cell;
+}
+
+async function handleAccountCreate() {
+  const email = el('account-create-email').value.trim();
+  const displayName = el('account-create-display').value.trim();
+  const password = el('account-create-password').value;
+  const role = el('account-create-role').value;
+  if (!email || !displayName || !password) {
+    setAccountAdminMessage('Account name, display name, and password are required.', 'error');
+    return;
+  }
+  try {
+    const created = await apiCreateAccount({
+      email,
+      display_name: displayName,
+      password,
+      role,
+    });
+    el('account-create-email').value = '';
+    el('account-create-display').value = '';
+    el('account-create-password').value = '';
+    setAccountAdminMessage(`Created ${created.email}.`, 'success');
+    await refreshAccountAdmin();
+  } catch (err) {
+    setAccountAdminMessage('Could not create account.', 'error');
+    console.error('Account create failed:', err);
+  }
 }
 
 // ---- Inspector ----
@@ -505,7 +1271,7 @@ async function renderAttributes(ownerType, ownerId, body) {
   const title = createEl('div', 'inspector-section-title');
   title.textContent = 'Attributes';
   const list = createEl('div', 'inspector-attribute-list');
-  list.textContent = 'Loading...';
+  list.appendChild(buildAttributeState('loading', 'Loading attributes...'));
   sec.appendChild(title);
   sec.appendChild(list);
   body.appendChild(sec);
@@ -514,16 +1280,27 @@ async function renderAttributes(ownerType, ownerId, body) {
     const attributes = await apiListAttributes(ownerType, ownerId);
     clearChildren(list);
     if (!attributes.length) {
-      list.textContent = 'No attributes yet.';
+      list.appendChild(buildAttributeState('empty', 'No attributes yet.'));
       return;
     }
     attributes.forEach(attribute => {
       list.appendChild(buildAttributeItem(attribute));
     });
   } catch (err) {
-    list.textContent = 'Could not load attributes.';
+    clearChildren(list);
+    list.appendChild(buildAttributeState('error', 'Could not load attributes.'));
     console.error('Attribute load failed:', err);
   }
+}
+
+function buildAttributeState(type, message) {
+  const state = createEl('div', `inspector-attribute-state is-${type}`);
+  const dot = createEl('span', 'inspector-attribute-state-dot');
+  const text = createEl('span', 'inspector-attribute-state-text');
+  text.textContent = message;
+  state.appendChild(dot);
+  state.appendChild(text);
+  return state;
 }
 
 function buildAttributeItem(attribute) {
@@ -724,7 +1501,7 @@ function openEditModal(nodeId) {
   modalEntityId = nodeId;
   el('modal-title').textContent = `Edit ${ENTITY_LABELS[node.entityType] || node.entityType}`;
   el('modal-delete').style.display = 'inline-flex';
-  el('modal-delete').textContent = destructiveActionLabel(node.entityType);
+  setDeleteButton(el('modal-delete'), destructiveActionLabel(node.entityType));
   buildModalForm(node.entityType, node.data);
   el('modal-overlay').classList.remove('modal-hidden');
 }
@@ -824,9 +1601,14 @@ async function handleModalSave() {
       } else {
         try {
           if (modalEntityType === 'person' && window.currentNetworkId) {
-            const existing = await maybeUseExistingPerson(data);
-            if (existing) {
-              data.id = existing.id;
+            el('modal-overlay').classList.add('modal-hidden');
+            const duplicateResult = await maybeUseExistingPerson(data);
+            if (duplicateResult && duplicateResult.cancelled) {
+              el('modal-overlay').classList.remove('modal-hidden');
+              return;
+            }
+            if (duplicateResult && duplicateResult.person) {
+              data.id = duplicateResult.person.id;
             }
           }
           result = await apiCreate(modalEntityType, data);
@@ -849,7 +1631,7 @@ async function handleModalSave() {
     closeModal();
   } catch (err) {
     console.error('Save failed:', err);
-    alert('Could not save. Please try again.');
+    await openMessageDialog('Save Failed', 'Could not save. Please try again.');
   } finally {
     el('modal-save').disabled = false;
     el('modal-save').textContent = 'Save';
@@ -860,34 +1642,39 @@ async function maybeUseExistingPerson(data) {
   if (!data.name && !data.nickname) return null;
   const matches = await apiPersonMatches({ name: data.name || '', nickname: data.nickname || '' });
   if (!matches.length) return null;
-  const top = matches[0];
-  const reasons = (top.reasons || []).join(', ') || 'possible duplicate';
-  const confidence = Math.round((top.confidence || 0) * 100);
-  const message = `Possible match: ${top.person.name} (${confidence}%, ${reasons}).\n\nLink this person to the selected network instead of creating a new global person?`;
-  return confirm(message) ? top.person : null;
+  return openDuplicateDialog(matches);
 }
 
 async function handleModalDelete() {
   if (!modalEntityId) return;
-  const node = graph.getNode(modalEntityId);
-  const action = destructiveActionLabel(modalEntityType);
-  if (!confirm(`${action} "${node ? node.label : '?'}"?`)) return;
+  await deleteNodeWithDialog(modalEntityId, { closeNodeModal: true });
+}
 
+async function deleteNodeWithDialog(nodeId, options) {
+  const node = graph.getNode(nodeId);
+  if (!node) return;
+  const action = destructiveActionLabel(node.entityType);
+  const ok = await openConfirmDialog({
+    title: `${action} Node`,
+    message: `${action} "${node.label || '?'}"?`,
+    confirmLabel: action,
+  });
+  if (!ok) return;
   try {
     if (!isTemporaryGraphMode()) {
       try {
-        await apiDelete(modalEntityType, modalEntityId);
+        await apiDelete(node.entityType, nodeId);
       } catch (err) {
         if (!isTemporaryApiError(err)) throw err;
         localOnlyWarning(`Node ${action.toLowerCase()}`, err);
       }
     }
-    removeNodeEl(modalEntityId);
-    graph.removeNode(modalEntityId);
-    closeModal();
+    removeNodeEl(nodeId);
+    graph.removeNode(nodeId);
+    if (options && options.closeNodeModal) closeModal();
   } catch (err) {
     console.error(`${action} failed:`, err);
-    alert(`Could not ${action.toLowerCase()}. Please try again.`);
+    await openMessageDialog(`${action} Failed`, `Could not ${action.toLowerCase()}. Please try again.`);
   }
 }
 
@@ -895,6 +1682,28 @@ function closeModal() {
   el('modal-overlay').classList.add('modal-hidden');
   modalEntityType = null;
   modalEntityId = null;
+}
+
+function validDateInputValue(value) {
+  if (!value) return true;
+  if (!/^\d{4}(-\d{2})?(-\d{2})?$/.test(value)) return false;
+  const parts = value.split('-').map(part => Number(part));
+  if (parts.length >= 2 && (parts[1] < 1 || parts[1] > 12)) return false;
+  if (parts.length === 3 && (parts[2] < 1 || parts[2] > 31)) return false;
+  return true;
+}
+
+async function validateDateInputs(inputs) {
+  for (const input of inputs) {
+    const value = input.value.trim();
+    if (validDateInputValue(value)) continue;
+    input.focus();
+    input.style.borderColor = 'var(--error)';
+    setTimeout(() => { input.style.borderColor = ''; }, 1200);
+    await openMessageDialog('Invalid Date', 'Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+    return false;
+  }
+  return true;
 }
 
 // ---- Attribute modal ----
@@ -950,6 +1759,8 @@ async function handleAttributeSave() {
     return;
   }
 
+  if (!await validateDateInputs([el('attribute-start'), el('attribute-end')])) return;
+
   const data = {
     type: el('attribute-type').value,
     value,
@@ -975,7 +1786,7 @@ async function handleAttributeSave() {
     renderInspector(nodeId);
   } catch (err) {
     console.error('Attribute save failed:', err);
-    alert('Could not save attribute.');
+    await openMessageDialog('Attribute Save Failed', 'Could not save attribute.');
   } finally {
     el('attribute-modal-save').disabled = false;
     el('attribute-modal-save').textContent = 'Save';
@@ -986,6 +1797,7 @@ async function handleAttributeSave() {
 
 let linkSourceNodeId = null;
 let linkTargetNodeId = null;
+let linkEditingId = null;
 
 function broadEntityType(entityType) {
   if (entityType === 'person') return 'person';
@@ -1052,7 +1864,7 @@ function configureLinkTypeOptions(source, target) {
 
 function updateLinkContextFields() {
   const selected = el('link-type-select').value;
-  const custom = selected === '__custom__';
+  const custom = selected === '__custom__' || (linkEditingId && selected.startsWith('custom_'));
   const contextual = custom || relationshipNeedsContext(selected);
   el('link-custom-group').style.display = custom ? '' : 'none';
   el('link-role-group').style.display = contextual ? '' : 'none';
@@ -1068,15 +1880,65 @@ function initLinkModal() {
   });
   el('link-type-select').addEventListener('change', updateLinkContextFields);
   el('link-modal-save').addEventListener('click', handleLinkSave);
+  el('link-modal-delete').addEventListener('click', handleLinkDelete);
 }
 
 function openLinkModal(sourceId, targetId) {
+  linkEditingId = null;
   linkSourceNodeId = sourceId;
   linkTargetNodeId = targetId;
 
   const source = graph.getNode(sourceId);
   const target = graph.getNode(targetId);
+  if (!source || !target) return;
 
+  renderLinkPreview(source, target);
+  el('link-modal-title').textContent = 'Create Relationship';
+  el('link-modal-save').textContent = 'Create';
+  el('link-modal-delete').style.display = 'none';
+  el('link-type-select').disabled = false;
+  configureLinkTypeOptions(source, target);
+  el('link-custom-label').value = '';
+  el('link-role').value = '';
+  el('link-start').value = '';
+  el('link-end').value = '';
+  el('link-current').checked = false;
+  el('link-notes').value = '';
+  el('link-modal-overlay').classList.remove('modal-hidden');
+  el('link-type-select').focus();
+
+  graph.setLinkSource(null);
+}
+
+function openRelationshipEditModal(linkId) {
+  const link = graph.getLink(linkId);
+  if (!link) return;
+  const source = graph.getNode(link.sourceId);
+  const target = graph.getNode(link.targetId);
+  if (!source || !target) return;
+
+  linkEditingId = linkId;
+  linkSourceNodeId = link.sourceId;
+  linkTargetNodeId = link.targetId;
+  renderLinkPreview(source, target);
+  el('link-modal-title').textContent = 'Edit Relationship';
+  el('link-modal-save').textContent = 'Save';
+  el('link-modal-delete').style.display = 'inline-flex';
+  configureLinkTypeOptions(source, target);
+  ensureLinkTypeOption(link.type, relationshipLabel(link));
+  el('link-type-select').value = link.type;
+  el('link-type-select').disabled = false;
+  el('link-custom-label').value = link.customLabel || customRelationshipLabel(link.type) || '';
+  el('link-role').value = link.role || '';
+  el('link-start').value = link.startDate || '';
+  el('link-end').value = link.endDate || '';
+  el('link-current').checked = Boolean(link.current);
+  el('link-notes').value = link.notes || '';
+  updateLinkContextFields();
+  el('link-modal-overlay').classList.remove('modal-hidden');
+}
+
+function renderLinkPreview(source, target) {
   const preview = el('link-nodes-preview');
   clearChildren(preview);
 
@@ -1096,24 +1958,41 @@ function openLinkModal(sourceId, targetId) {
   arrow.textContent = '\u2192';
   preview.appendChild(arrow);
   preview.appendChild(nodeChip(target));
+}
 
-  configureLinkTypeOptions(source, target);
-  el('link-custom-label').value = '';
-  el('link-role').value = '';
-  el('link-start').value = '';
-  el('link-end').value = '';
-  el('link-current').checked = false;
-  el('link-notes').value = '';
-  el('link-modal-overlay').classList.remove('modal-hidden');
-  el('link-type-select').focus();
+function ensureLinkTypeOption(value, label) {
+  const select = el('link-type-select');
+  if (Array.from(select.options).some(option => option.value === value)) return;
+  const option = createEl('option', '');
+  option.value = value;
+  option.textContent = label || value;
+  select.appendChild(option);
+}
 
-  graph.setLinkSource(null);
+function relationshipFromAPI(rel) {
+  return {
+    id: rel.id,
+    sourceId: rel.source_id || rel.sourceId,
+    targetId: rel.target_id || rel.targetId,
+    sourceType: rel.source_type || rel.sourceType,
+    targetType: rel.target_type || rel.targetType,
+    type: rel.type,
+    customLabel: rel.custom_label || rel.customLabel,
+    role: rel.role || '',
+    startDate: rel.start_date || rel.startDate || '',
+    endDate: rel.end_date || rel.endDate || '',
+    current: rel.current,
+    notes: rel.notes || '',
+  };
 }
 
 async function handleLinkSave() {
   let type = el('link-type-select').value;
   const customLabel = el('link-custom-label').value.trim();
   let resolvedCustomLabel = customRelationshipLabel(type);
+  if (linkEditingId && type.startsWith('custom_')) {
+    resolvedCustomLabel = customLabel;
+  }
   if (type === '__custom__') {
     type = customRelationshipType(customLabel);
     if (!type) {
@@ -1124,7 +2003,9 @@ async function handleLinkSave() {
     }
     resolvedCustomLabel = customLabel;
   }
+  if (!await validateDateInputs([el('link-start'), el('link-end')])) return;
   const data = {
+    type,
     custom_label: resolvedCustomLabel || '',
     role: el('link-role').value.trim(),
     start_date: el('link-start').value.trim(),
@@ -1139,22 +2020,37 @@ async function handleLinkSave() {
   el('link-modal-save').disabled = true;
   try {
     let rel;
-    if (isTemporaryGraphMode()) {
+    if (!isTemporaryGraphMode() && type.startsWith('custom_') && resolvedCustomLabel && window.currentNetworkId) {
+      const storedType = await apiCreateCustomRelationshipType(window.currentNetworkId, {
+        key: type,
+        label: resolvedCustomLabel,
+        source_type: broadEntityType(source.entityType),
+        target_type: broadEntityType(target.entityType),
+        direction_behavior: 'directed',
+      });
+      currentCustomRelationshipTypes = currentCustomRelationshipTypes
+        .filter(item => !(item.key === storedType.key && item.source_type === storedType.source_type && item.target_type === storedType.target_type))
+        .concat(storedType);
+    }
+    if (linkEditingId) {
+      if (isTemporaryGraphMode()) {
+        rel = Object.assign({}, graph.getLink(linkEditingId), {
+          custom_label: data.custom_label,
+          role: data.role,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          current: data.current,
+          notes: data.notes,
+          type,
+        });
+      } else {
+        rel = await apiUpdateRelationship(linkEditingId, data);
+      }
+      graph.updateLink(linkEditingId, relationshipFromAPI(rel));
+    } else if (isTemporaryGraphMode()) {
       rel = createTemporaryRelationship(source, target, type, data);
     } else {
       try {
-        if (type.startsWith('custom_') && resolvedCustomLabel && window.currentNetworkId) {
-          const storedType = await apiCreateCustomRelationshipType(window.currentNetworkId, {
-            key: type,
-            label: resolvedCustomLabel,
-            source_type: broadEntityType(source.entityType),
-            target_type: broadEntityType(target.entityType),
-            direction_behavior: 'directed',
-          });
-          currentCustomRelationshipTypes = currentCustomRelationshipTypes
-            .filter(item => !(item.key === storedType.key && item.source_type === storedType.source_type && item.target_type === storedType.target_type))
-            .concat(storedType);
-        }
         rel = await apiCreateRelationship(
           source.id, source.entityType,
           target.id, target.entityType,
@@ -1166,33 +2062,28 @@ async function handleLinkSave() {
         rel = createTemporaryRelationship(source, target, type, data);
       }
     }
-    graph.addLink({
-      id: rel.id,
-      sourceId: source.id,
-      targetId: target.id,
-      sourceType: source.entityType,
-      targetType: target.entityType,
-      type: rel.type,
-      customLabel: rel.custom_label,
-      role: rel.role,
-      startDate: rel.start_date,
-      endDate: rel.end_date,
-      current: rel.current,
-      notes: rel.notes,
-    });
+    if (!linkEditingId) graph.addLink(relationshipFromAPI(rel));
     closeLinkModal();
   } catch (err) {
     console.error('Link save failed:', err);
-    alert('Could not create relationship.');
+    await openMessageDialog('Relationship Save Failed', 'Could not save relationship.');
   } finally {
     el('link-modal-save').disabled = false;
   }
+}
+
+async function handleLinkDelete() {
+  if (!linkEditingId) return;
+  await promptDeleteLink(linkEditingId);
+  if (!graph.getLink(linkEditingId)) closeLinkModal();
 }
 
 function closeLinkModal() {
   el('link-modal-overlay').classList.add('modal-hidden');
   linkSourceNodeId = null;
   linkTargetNodeId = null;
+  linkEditingId = null;
+  el('link-type-select').disabled = false;
   graph.setLinkSource(null);
 }
 
@@ -1275,28 +2166,19 @@ function initSearch() {
 
 function initKeyboard() {
   document.addEventListener('keydown', (e) => {
+    if (!el('confirm-modal-overlay').classList.contains('modal-hidden')) {
+      if (e.key === 'Escape') closeConfirmDialog(false);
+      return;
+    }
+    if (!el('duplicate-modal-overlay').classList.contains('modal-hidden')) {
+      if (e.key === 'Escape') closeDuplicateDialog({ cancelled: true });
+      return;
+    }
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && graph.selectedNodeId) {
       e.preventDefault();
-      const nodeId = graph.selectedNodeId;
-      const node = graph.getNode(nodeId);
-      const action = destructiveActionLabel(node ? node.entityType : '');
-      if (!confirm(`${action} "${node ? node.label : '?'}"?`)) return;
-      const deletePromise = isTemporaryGraphMode()
-        ? Promise.resolve()
-        : apiDelete(node.entityType, nodeId).catch(err => {
-          if (!isTemporaryApiError(err)) throw err;
-          localOnlyWarning(`Node ${action.toLowerCase()}`, err);
-        });
-
-      deletePromise.then(() => {
-        removeNodeEl(nodeId);
-        graph.removeNode(nodeId);
-      }).catch(err => {
-        console.error(`${action} failed:`, err);
-        alert(`Could not ${action.toLowerCase()}.`);
-      });
+      deleteNodeWithDialog(graph.selectedNodeId);
     }
 
     if (e.key === 'Escape') {

@@ -114,6 +114,13 @@ async function apiDeleteRelationship(id) {
   return apiFetch('/relationships/' + id, { method: 'DELETE' });
 }
 
+async function apiUpdateRelationship(id, data) {
+  return apiFetch('/relationships/' + id, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 async function apiSearchAll(query) {
   return apiFetch('/search?q=' + encodeURIComponent(query));
 }
@@ -150,6 +157,25 @@ async function apiLogout() {
   return apiFetch('/auth/logout', { method: 'POST' });
 }
 
+async function apiListAccounts() {
+  return apiFetch('/accounts');
+}
+
+async function apiCreateAccount(data) {
+  return apiFetch('/accounts', { method: 'POST', body: JSON.stringify(data) });
+}
+
+async function apiUpdateAccountRole(id, role) {
+  return apiFetch('/accounts/' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+async function apiDisableAccount(id) {
+  return apiFetch('/accounts/' + id + '/disable', { method: 'POST' });
+}
+
 async function apiListNetworks() {
   return apiFetch('/networks');
 }
@@ -160,6 +186,10 @@ async function apiCreateNetwork(data) {
 
 async function apiUpdateNetwork(id, data) {
   return apiFetch('/networks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+async function apiArchiveNetwork(id) {
+  return apiFetch('/networks/' + id + '/archive', { method: 'POST' });
 }
 
 async function apiSearchNetworks(query) {

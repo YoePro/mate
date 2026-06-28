@@ -70,6 +70,7 @@ type Storage interface {
 	CreateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error)
 	GetRelationship(ctx context.Context, id string) (*models.Relationship, error)
 	ListRelationships(ctx context.Context) ([]models.Relationship, error)
+	UpdateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error)
 	DeleteRelationship(ctx context.Context, id string) error
 
 	SavePosition(ctx context.Context, position models.Position) error

@@ -55,9 +55,11 @@ This document summarizes implemented product features at the start of 0.12 stabi
 - Select connected nodes.
 - Fit all, fit selection, zoom in, zoom out, and reset zoom.
 - Hide selected, show hidden, and auto layout.
-- Archive is the normal destructive UI action where supported.
+- Delete is the normal destructive UI action where supported.
+- Browser-local node color preferences are available from the account menu.
+- Relationship and attribute date fields use shared validation for `YYYY`, `YYYY-MM`, and `YYYY-MM-DD`.
 
 ## 0.12 stabilization focus
 
 - Service tests for custom relationship validation, relationship attributes, and network-owner checks.
-- Manual smoke testing for grouped tools, relationship type filtering, custom relationship reuse, Project behavior, gender colors, archive behavior, and network permission boundaries.
+- Manual smoke testing for grouped tools, relationship type filtering, custom relationship reuse, Project behavior, gender colors, delete behavior, and network permission boundaries.

@@ -101,7 +101,13 @@ function renderLink(link) {
   g.appendChild(text);
 
   g.addEventListener('click', () => {
-    promptDeleteLink(link.id);
+    openRelationshipEditModal(link.id);
+  });
+
+  g.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openRelationshipContextMenu(link.id, e.clientX, e.clientY);
   });
 
   const existing = qs(`[data-link-group="${link.id}"]`, layer);
@@ -124,25 +130,31 @@ function updateLinksForNode(nodeId) {
     .forEach(renderLink);
 }
 
-function promptDeleteLink(linkId) {
+async function promptDeleteLink(linkId) {
   const link = graph.getLink(linkId);
   if (!link) return;
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
   const label = relationshipLabel(link);
-  const msg = `Remove relationship "${label}" between ${source ? source.label : '?'} and ${target ? target.label : '?'}?`;
-  if (!confirm(msg)) return;
-  const deletePromise = isTemporaryGraphMode()
-    ? Promise.resolve()
-    : apiDeleteRelationship(linkId).catch(err => {
-      if (!isTemporaryApiError(err)) throw err;
-      localOnlyWarning('Relationship delete', err);
-    });
-
-  deletePromise.then(() => {
-    graph.removeLink(linkId);
-  }).catch(err => {
-    console.error('Failed to delete relationship:', err);
-    alert('Could not delete relationship.');
+  const ok = await openConfirmDialog({
+    title: 'Delete Relationship',
+    message: `Remove "${label}" between ${source ? source.label : '?'} and ${target ? target.label : '?'}?`,
+    confirmLabel: 'Delete',
   });
+  if (!ok) return;
+
+  try {
+    if (!isTemporaryGraphMode()) {
+      try {
+        await apiDeleteRelationship(linkId);
+      } catch (err) {
+        if (!isTemporaryApiError(err)) throw err;
+        localOnlyWarning('Relationship delete', err);
+      }
+    }
+    graph.removeLink(linkId);
+  } catch (err) {
+    console.error('Failed to delete relationship:', err);
+    await openMessageDialog('Delete Failed', 'Could not delete relationship.');
+  }
 }

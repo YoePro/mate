@@ -112,6 +112,20 @@ Response:
 }
 ```
 
+### POST /api/v1/auth/register
+
+Creates a self-service account after owner bootstrap. Self-service accounts are created with the `editor` role regardless of any role value in the request. This endpoint returns `409` while first-owner bootstrap is still required.
+
+Request:
+
+```json
+{
+  "email": "new-user@example.com",
+  "display_name": "New User",
+  "password": "minimum-8-chars"
+}
+```
+
 ### POST /api/v1/auth/logout
 
 Deletes the current session and expires the session cookie. The frontend header uses this endpoint for `Sign out`.
@@ -124,7 +138,9 @@ Returns the authenticated account tied to the current session cookie.
 
 ## Accounts
 
-Account management requires an authenticated owner session. These endpoints are API-only until the user admin UI is added.
+Account management requires an authenticated `owner` or `admin` session. MATE 0.13 exposes these endpoints through the Account Administration window.
+
+Owners can manage all accounts. Admins can list accounts and manage `editor` and `viewer` accounts, but cannot create or modify `owner` or `admin` accounts. The backend blocks disabling or demoting the last usable owner account.
 
 Supported roles are `owner`, `admin`, `editor`, and `viewer`.
 
@@ -665,6 +681,26 @@ Request:
 ### GET /api/v1/relationships/{id}
 
 Returns a relationship.
+
+### PUT /api/v1/relationships/{id}
+
+Updates editable relationship properties. `source_id` and `target_id` are preserved. `type` may be changed; when it changes, the backend replaces the underlying Neo4j edge while preserving the MATE relationship id.
+
+Request:
+
+```json
+{
+  "custom_label": "Mentors",
+  "type": "custom_mentors",
+  "role": "Developer",
+  "start_date": "2024",
+  "end_date": "",
+  "current": true,
+  "notes": "Context for this relationship"
+}
+```
+
+`PATCH` is accepted with the same body.
 
 ### DELETE /api/v1/relationships/{id}
 

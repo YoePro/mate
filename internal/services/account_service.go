@@ -55,6 +55,19 @@ func (s *AccountService) BootstrapOwner(ctx context.Context, input AccountInput)
 	return s.createAccount(ctx, input)
 }
 
+// Register creates a self-service account after the first owner exists.
+func (s *AccountService) Register(ctx context.Context, input AccountInput) (*models.Account, error) {
+	status, err := s.store.SetupStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if status.NeedsOwner {
+		return nil, storage.ErrConflict
+	}
+	input.Role = models.RoleEditor
+	return s.createAccount(ctx, input)
+}
+
 // Login verifies credentials and creates a session.
 func (s *AccountService) Login(ctx context.Context, email string, password string) (*LoginResult, error) {
 	account, err := s.store.GetAccountByEmail(ctx, normalizeEmail(email))
@@ -111,17 +124,20 @@ func (s *AccountService) CurrentAccount(ctx context.Context, token string) (*mod
 	return publicAccount(*account), nil
 }
 
-// CreateAccount creates an account. Only owner can create accounts in 0.7.
+// CreateAccount creates an account. Owners can create any role; admins can create non-admin accounts.
 func (s *AccountService) CreateAccount(ctx context.Context, actor *models.Account, input AccountInput) (*models.Account, error) {
-	if !hasRole(actor, models.RoleOwner) {
+	if !canManageAccounts(actor) {
+		return nil, ErrForbidden
+	}
+	if hasRole(actor, models.RoleAdmin) && (input.Role == models.RoleOwner || input.Role == models.RoleAdmin) {
 		return nil, ErrForbidden
 	}
 	return s.createAccount(ctx, input)
 }
 
-// ListAccounts returns all accounts. Only owner can list accounts in 0.7.
+// ListAccounts returns all accounts. Owners and admins can list accounts.
 func (s *AccountService) ListAccounts(ctx context.Context, actor *models.Account) ([]models.Account, error) {
-	if !hasRole(actor, models.RoleOwner) {
+	if !canManageAccounts(actor) {
 		return nil, ErrForbidden
 	}
 	accounts, err := s.store.ListAccounts(ctx)
@@ -134,9 +150,9 @@ func (s *AccountService) ListAccounts(ctx context.Context, actor *models.Account
 	return accounts, nil
 }
 
-// GetAccount returns one account. Only owner can inspect accounts in 0.7.
+// GetAccount returns one account. Owners and admins can inspect accounts.
 func (s *AccountService) GetAccount(ctx context.Context, actor *models.Account, id string) (*models.Account, error) {
-	if !hasRole(actor, models.RoleOwner) {
+	if !canManageAccounts(actor) {
 		return nil, ErrForbidden
 	}
 	account, err := s.store.GetAccount(ctx, id)
@@ -146,13 +162,25 @@ func (s *AccountService) GetAccount(ctx context.Context, actor *models.Account, 
 	return publicAccount(*account), nil
 }
 
-// UpdateAccountRole updates an account role. Only owner can change roles in 0.7.
+// UpdateAccountRole updates an account role.
 func (s *AccountService) UpdateAccountRole(ctx context.Context, actor *models.Account, id string, role models.Role) (*models.Account, error) {
-	if !hasRole(actor, models.RoleOwner) {
+	if !canManageAccounts(actor) {
 		return nil, ErrForbidden
 	}
 	if !validRole(role) {
 		return nil, ErrInvalidInput
+	}
+	target, err := s.store.GetAccount(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if hasRole(actor, models.RoleAdmin) && (target.Role == models.RoleOwner || target.Role == models.RoleAdmin || role == models.RoleOwner || role == models.RoleAdmin) {
+		return nil, ErrForbidden
+	}
+	if target.Role == models.RoleOwner && role != models.RoleOwner {
+		if err := s.requireAnotherUsableOwner(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 	account, err := s.store.UpdateAccountRole(ctx, id, role)
 	if err != nil {
@@ -161,13 +189,25 @@ func (s *AccountService) UpdateAccountRole(ctx context.Context, actor *models.Ac
 	return publicAccount(*account), nil
 }
 
-// DisableAccount disables an account. Only owner can disable accounts in 0.7.
+// DisableAccount disables an account.
 func (s *AccountService) DisableAccount(ctx context.Context, actor *models.Account, id string) (*models.Account, error) {
-	if !hasRole(actor, models.RoleOwner) {
+	if !canManageAccounts(actor) {
 		return nil, ErrForbidden
 	}
 	if actor.ID == id {
 		return nil, ErrInvalidInput
+	}
+	target, err := s.store.GetAccount(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if hasRole(actor, models.RoleAdmin) && (target.Role == models.RoleOwner || target.Role == models.RoleAdmin) {
+		return nil, ErrForbidden
+	}
+	if target.Role == models.RoleOwner {
+		if err := s.requireAnotherUsableOwner(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 	account, err := s.store.DisableAccount(ctx, id)
 	if err != nil {
@@ -227,6 +267,27 @@ func validRole(role models.Role) bool {
 
 func hasRole(account *models.Account, role models.Role) bool {
 	return account != nil && subtle.ConstantTimeCompare([]byte(account.Role), []byte(role)) == 1
+}
+
+func canManageAccounts(account *models.Account) bool {
+	return hasRole(account, models.RoleOwner) || hasRole(account, models.RoleAdmin)
+}
+
+func (s *AccountService) requireAnotherUsableOwner(ctx context.Context, targetID string) error {
+	accounts, err := s.store.ListAccounts(ctx)
+	if err != nil {
+		return err
+	}
+	usableOwners := 0
+	for _, account := range accounts {
+		if account.ID != targetID && account.Role == models.RoleOwner && !account.Disabled {
+			usableOwners++
+		}
+	}
+	if usableOwners == 0 {
+		return ErrInvalidInput
+	}
+	return nil
 }
 
 func publicAccount(account models.Account) *models.Account {

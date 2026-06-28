@@ -54,6 +54,12 @@ Relationships can carry structured context:
 
 The frontend uses these fields for relationship contexts such as `works_at` with a role like "Developer" or "Chairman".
 
+Date-like UI fields currently accept `YYYY`, `YYYY-MM`, and `YYYY-MM-DD` before sending values to the backend.
+
+## UI preferences
+
+MATE 0.13 stores node color preferences in browser local storage, keyed by the signed-in account. These preferences are not backend-persisted yet. A later storage decision should decide whether UI preferences are account-owned, network-owned, or both.
+
 Network-scoped relationship persistence is important for non-person links such as `Organization -> sponsors -> Project`, because those links cannot be inferred from a network's person memberships.
 
 Custom relationship type definitions are network-scoped. They store the reusable key and label plus broad source/target entity types and direction behavior. The current direction behavior values are `directed` and `undirected`; 0.11 stores the value but does not yet alter graph rendering based on it.
@@ -62,7 +68,7 @@ Custom relationship type keys must be safe Neo4j relationship type names and cur
 
 ## Archive behavior
 
-Archive is the normal destructive action in the UI where supported.
+Delete is the normal destructive action in the UI where supported. For supported entities, the backend stores this as an archive/hidden state instead of physically deleting shared identity data.
 
 - Network person archive removes the person from that network without deleting the global person.
 - Organization and Project delete endpoints archive the node by setting `archived` and `active`.

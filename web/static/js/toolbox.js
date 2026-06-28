@@ -3,11 +3,17 @@
 let pendingEntityType = null;
 let pendingEntityDefaults = null;
 let dragPhantom = null;
+let selectionMarquee = null;
 
 function initToolbox() {
+  initToolboxSections();
+  graph.on('selection-changed', updateDataToolState);
+  graph.on('nodes-changed', updateDataToolState);
+
   qsa('[data-tool-action]').forEach(item => {
     item.addEventListener('click', () => runToolAction(item.dataset.toolAction));
   });
+  updateDataToolState();
 
   qsa('[data-entity]').forEach(item => {
     const entityType = item.dataset.entity;
@@ -36,6 +42,8 @@ function initToolbox() {
   });
 
   const workspace = el('workspace');
+
+  workspace.addEventListener('mousedown', startSelectionMarquee);
 
   workspace.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -66,6 +74,31 @@ function initToolbox() {
     cancelAddMode();
     openAddModal(type, pos.x, pos.y, defaults);
   });
+}
+
+function initToolboxSections() {
+  qsa('[data-toolbox-section]').forEach(section => {
+    const key = section.dataset.toolboxSection;
+    const toggle = qs('.toolbox-section-toggle', section);
+    if (!key || !toggle) return;
+
+    const collapsed = window.localStorage.getItem(`mate.toolbox.section.${key}`) === 'collapsed';
+    setToolboxSectionCollapsed(section, collapsed);
+
+    toggle.addEventListener('click', () => {
+      setToolboxSectionCollapsed(section, !section.classList.contains('is-collapsed'));
+    });
+  });
+}
+
+function setToolboxSectionCollapsed(section, collapsed) {
+  const key = section.dataset.toolboxSection;
+  const toggle = qs('.toolbox-section-toggle', section);
+  section.classList.toggle('is-collapsed', collapsed);
+  if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  if (key) {
+    window.localStorage.setItem(`mate.toolbox.section.${key}`, collapsed ? 'collapsed' : 'expanded');
+  }
 }
 
 function entityDefaultsFromElement(item) {
@@ -103,6 +136,9 @@ function runToolAction(action) {
   case 'select-connected':
     selectConnectedNodes();
     break;
+  case 'select-same-type':
+    selectSameNodeType();
+    break;
   case 'clear-selection':
     graph.selectNode(null);
     break;
@@ -114,6 +150,18 @@ function runToolAction(action) {
     break;
   case 'auto-layout':
     autoLayoutVisibleNodes();
+    break;
+  case 'lock-selected':
+    lockSelectedNodes();
+    break;
+  case 'unlock-selected':
+    unlockSelectedNodes();
+    break;
+  case 'edit-selected':
+    editSelectedNode();
+    break;
+  case 'delete-selected':
+    deleteSelectedNode();
     break;
   }
 }
@@ -137,18 +185,140 @@ function selectConnectedNodes() {
   canvas.fitToNodes(Array.from(ids).map(id => graph.getNode(id)).filter(Boolean));
 }
 
+function nodeSelectionType(node) {
+  if (!node) return '';
+  if (typeof isOrganizationEntityType === 'function' && isOrganizationEntityType(node.entityType)) return 'organization';
+  return node.entityType;
+}
+
+function selectSameNodeType(anchorId) {
+  const anchors = anchorId
+    ? [graph.getNode(anchorId)].filter(Boolean)
+    : selectedNodes();
+  if (!anchors.length) return;
+  const typeKeys = new Set(anchors.map(nodeSelectionType).filter(Boolean));
+  const ids = visibleNodes()
+    .filter(node => typeKeys.has(nodeSelectionType(node)))
+    .map(node => node.id);
+  graph.selectNodes(ids);
+  if (ids.length) canvas.fitToNodes(ids.map(id => graph.getNode(id)).filter(Boolean));
+}
+
 function hideSelectedNodes() {
   const ids = graph.selectedNodeIds.length ? graph.selectedNodeIds : (graph.selectedNodeId ? [graph.selectedNodeId] : []);
   if (!ids.length) return;
   graph.hideNodes(ids);
 }
 
+function selectedNodeIds() {
+  return graph.selectedNodeIds.length ? graph.selectedNodeIds : (graph.selectedNodeId ? [graph.selectedNodeId] : []);
+}
+
+function primarySelectedNodeId() {
+  const ids = selectedNodeIds();
+  return ids.length ? ids[0] : null;
+}
+
+function updateDataToolState() {
+  const hasSelection = Boolean(primarySelectedNodeId());
+  qsa('[data-requires-selection]').forEach(item => {
+    item.disabled = !hasSelection;
+  });
+}
+
+function editSelectedNode() {
+  const id = primarySelectedNodeId();
+  if (!id) return;
+  openEditModal(id);
+}
+
+function deleteSelectedNode() {
+  const id = primarySelectedNodeId();
+  if (!id) return;
+  deleteNodeWithDialog(id);
+}
+
+function lockSelectedNodes() {
+  const ids = selectedNodeIds();
+  if (!ids.length) return;
+  graph.lockNodes(ids);
+}
+
+function unlockSelectedNodes() {
+  const ids = selectedNodeIds();
+  if (!ids.length) return;
+  graph.unlockNodes(ids);
+}
+
 function visibleNodes() {
   return graph.nodes.filter(node => !graph.isNodeHidden(node.id));
 }
 
+function startSelectionMarquee(e) {
+  if (e.button !== 0 || pendingEntityType || graph.linkSourceId) return;
+  if (e.target !== el('workspace') && !e.target.closest('#workspace-empty')) return;
+  if (e.shiftKey) return;
+
+  const workspace = el('workspace');
+  const rect = workspace.getBoundingClientRect();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  let active = false;
+
+  function ensureMarquee() {
+    if (selectionMarquee) return;
+    selectionMarquee = createEl('div', 'selection-marquee');
+    workspace.appendChild(selectionMarquee);
+  }
+
+  function updateMarquee(ev) {
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (!active && Math.hypot(dx, dy) < 5) return;
+    active = true;
+    ensureMarquee();
+    const left = Math.min(startX, ev.clientX) - rect.left;
+    const top = Math.min(startY, ev.clientY) - rect.top;
+    const width = Math.abs(dx);
+    const height = Math.abs(dy);
+    selectionMarquee.style.left = left + 'px';
+    selectionMarquee.style.top = top + 'px';
+    selectionMarquee.style.width = width + 'px';
+    selectionMarquee.style.height = height + 'px';
+  }
+
+  function finishMarquee(ev) {
+    document.removeEventListener('mousemove', updateMarquee);
+    document.removeEventListener('mouseup', finishMarquee);
+    if (selectionMarquee) {
+      selectionMarquee.remove();
+      selectionMarquee = null;
+    }
+    if (!active) return;
+
+    const a = canvas.screenToWorld(startX, startY);
+    const b = canvas.screenToWorld(ev.clientX, ev.clientY);
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+    const ids = visibleNodes()
+      .filter(node => node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY)
+      .map(node => node.id);
+
+    if (e.ctrlKey || e.metaKey) {
+      graph.selectNodes(Array.from(new Set(graph.selectedNodeIds.concat(ids))));
+    } else {
+      graph.selectNodes(ids);
+    }
+  }
+
+  document.addEventListener('mousemove', updateMarquee);
+  document.addEventListener('mouseup', finishMarquee);
+}
+
 function autoLayoutVisibleNodes() {
-  const nodes = visibleNodes();
+  const nodes = visibleNodes().filter(node => !graph.isNodeLocked(node.id));
   if (!nodes.length) return;
   const cols = Math.ceil(Math.sqrt(nodes.length));
   const spacingX = 170;

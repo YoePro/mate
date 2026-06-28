@@ -41,6 +41,39 @@ func (s *RelationshipService) Get(ctx context.Context, id string) (*models.Relat
 	return s.store.GetRelationship(ctx, id)
 }
 
+// Update updates relationship properties. If the relationship type changes,
+// storage replaces the underlying Neo4j edge while preserving the MATE id.
+func (s *RelationshipService) Update(ctx context.Context, id string, relationship models.Relationship) (*models.Relationship, error) {
+	relationship.ID = id
+	relationship.CustomLabel = normalizeSpace(relationship.CustomLabel)
+	relationship.Role = normalizeSpace(relationship.Role)
+	relationship.StartDate = normalizeSpace(relationship.StartDate)
+	relationship.EndDate = normalizeSpace(relationship.EndDate)
+	relationship.Notes = normalizeSpace(relationship.Notes)
+	if relationship.ID == "" {
+		return nil, ErrInvalidInput
+	}
+	existing, err := s.store.GetRelationship(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	relationship.NetworkID = existing.NetworkID
+	relationship.SourceID = existing.SourceID
+	relationship.SourceType = existing.SourceType
+	relationship.TargetID = existing.TargetID
+	relationship.TargetType = existing.TargetType
+	if relationship.Type == "" {
+		relationship.Type = existing.Type
+	}
+	if !validRelationshipType(relationship.Type) {
+		return nil, ErrInvalidInput
+	}
+	if validCustomRelationshipType(string(relationship.Type)) && relationship.CustomLabel == "" {
+		return nil, ErrInvalidInput
+	}
+	return s.store.UpdateRelationship(ctx, relationship)
+}
+
 // Delete deletes a relationship.
 func (s *RelationshipService) Delete(ctx context.Context, id string) error {
 	return s.store.DeleteRelationship(ctx, id)

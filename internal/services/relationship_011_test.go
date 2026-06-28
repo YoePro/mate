@@ -100,6 +100,45 @@ func TestRelationshipService_CreateRequiresCustomLabelForCustomTypes(t *testing.
 	}
 }
 
+func TestRelationshipService_UpdatePreservesEndpointsAndAllowsTypeChange(t *testing.T) {
+	store := &serviceTestStore{
+		createdRelationship: models.Relationship{
+			ID:         "rel-1",
+			NetworkID:  "network-1",
+			SourceID:   "person-1",
+			SourceType: "person",
+			TargetID:   "org-1",
+			TargetType: "company",
+			Type:       models.RelationshipWorksAt,
+		},
+	}
+	service := &RelationshipService{store: store}
+
+	updated, err := service.Update(context.Background(), "rel-1", models.Relationship{
+		SourceID:   "other-source",
+		SourceType: "project",
+		TargetID:   "other-target",
+		TargetType: "project",
+		Type:       models.RelationshipSponsors,
+		Role:       " Developer ",
+		StartDate:  " 2024 ",
+		Current:    true,
+		Notes:      " Active role ",
+	})
+	if err != nil {
+		t.Fatalf("expected update to succeed, got %v", err)
+	}
+	if updated.SourceID != "person-1" || updated.TargetID != "org-1" {
+		t.Fatalf("expected endpoints to be preserved, got %#v", updated)
+	}
+	if updated.Type != models.RelationshipSponsors {
+		t.Fatalf("expected type to be updated, got %#v", updated)
+	}
+	if updated.Role != "Developer" || updated.StartDate != "2024" || updated.Notes != "Active role" {
+		t.Fatalf("expected normalized editable fields, got %#v", updated)
+	}
+}
+
 func TestNetworkService_CreateCustomRelationshipTypeRequiresNetworkOwner(t *testing.T) {
 	store := &serviceTestStore{
 		network: models.Network{ID: "network-1", OwnerID: "owner-1", Name: "Owned"},
@@ -143,31 +182,56 @@ func TestNetworkService_CreateCustomRelationshipTypeRequiresNetworkOwner(t *test
 }
 
 type serviceTestStore struct {
-	network                    models.Network
+	needsOwner                bool
+	network                   models.Network
+	accounts                  []models.Account
 	createdRelationship       models.Relationship
 	createdCustomRelationship models.CustomRelationshipType
 }
 
 func (s *serviceTestStore) Close(ctx context.Context) error { return nil }
 func (s *serviceTestStore) SetupStatus(ctx context.Context) (*models.SetupStatus, error) {
-	return nil, storage.ErrNotFound
+	return &models.SetupStatus{NeedsOwner: s.needsOwner}, nil
 }
 func (s *serviceTestStore) CreateAccount(ctx context.Context, account models.Account) (*models.Account, error) {
-	return nil, storage.ErrNotFound
+	s.accounts = append(s.accounts, account)
+	return &account, nil
 }
 func (s *serviceTestStore) GetAccount(ctx context.Context, id string) (*models.Account, error) {
+	for _, account := range s.accounts {
+		if account.ID == id {
+			return &account, nil
+		}
+	}
 	return nil, storage.ErrNotFound
 }
 func (s *serviceTestStore) GetAccountByEmail(ctx context.Context, email string) (*models.Account, error) {
+	for _, account := range s.accounts {
+		if account.Email == email {
+			return &account, nil
+		}
+	}
 	return nil, storage.ErrNotFound
 }
 func (s *serviceTestStore) ListAccounts(ctx context.Context) ([]models.Account, error) {
-	return nil, storage.ErrNotFound
+	return append([]models.Account(nil), s.accounts...), nil
 }
 func (s *serviceTestStore) UpdateAccountRole(ctx context.Context, id string, role models.Role) (*models.Account, error) {
+	for i := range s.accounts {
+		if s.accounts[i].ID == id {
+			s.accounts[i].Role = role
+			return &s.accounts[i], nil
+		}
+	}
 	return nil, storage.ErrNotFound
 }
 func (s *serviceTestStore) DisableAccount(ctx context.Context, id string) (*models.Account, error) {
+	for i := range s.accounts {
+		if s.accounts[i].ID == id {
+			s.accounts[i].Disabled = true
+			return &s.accounts[i], nil
+		}
+	}
 	return nil, storage.ErrNotFound
 }
 func (s *serviceTestStore) CreateSession(ctx context.Context, session models.Session) (*models.Session, error) {
@@ -195,7 +259,9 @@ func (s *serviceTestStore) SearchNetworks(ctx context.Context, accountID string,
 func (s *serviceTestStore) UpdateNetwork(ctx context.Context, network models.Network) (*models.Network, error) {
 	return nil, storage.ErrNotFound
 }
-func (s *serviceTestStore) ArchiveNetwork(ctx context.Context, id string) error { return storage.ErrNotFound }
+func (s *serviceTestStore) ArchiveNetwork(ctx context.Context, id string) error {
+	return storage.ErrNotFound
+}
 func (s *serviceTestStore) AddPersonToNetwork(ctx context.Context, context models.NetworkPersonContext) (*models.NetworkPersonContext, error) {
 	return nil, storage.ErrNotFound
 }
@@ -242,7 +308,9 @@ func (s *serviceTestStore) ListPersons(ctx context.Context) ([]models.Person, er
 func (s *serviceTestStore) UpdatePerson(ctx context.Context, person models.Person) (*models.Person, error) {
 	return nil, storage.ErrNotFound
 }
-func (s *serviceTestStore) DeletePerson(ctx context.Context, id string) error { return storage.ErrNotFound }
+func (s *serviceTestStore) DeletePerson(ctx context.Context, id string) error {
+	return storage.ErrNotFound
+}
 func (s *serviceTestStore) GetPersonProfile(ctx context.Context, id string) (*models.PersonProfile, error) {
 	return nil, storage.ErrNotFound
 }
@@ -300,16 +368,25 @@ func (s *serviceTestStore) ListProjects(ctx context.Context) ([]models.Project, 
 func (s *serviceTestStore) UpdateProject(ctx context.Context, project models.Project) (*models.Project, error) {
 	return nil, storage.ErrNotFound
 }
-func (s *serviceTestStore) DeleteProject(ctx context.Context, id string) error { return storage.ErrNotFound }
+func (s *serviceTestStore) DeleteProject(ctx context.Context, id string) error {
+	return storage.ErrNotFound
+}
 func (s *serviceTestStore) CreateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error) {
 	s.createdRelationship = relationship
 	return &s.createdRelationship, nil
 }
 func (s *serviceTestStore) GetRelationship(ctx context.Context, id string) (*models.Relationship, error) {
+	if s.createdRelationship.ID == id {
+		return &s.createdRelationship, nil
+	}
 	return nil, storage.ErrNotFound
 }
 func (s *serviceTestStore) ListRelationships(ctx context.Context) ([]models.Relationship, error) {
 	return nil, storage.ErrNotFound
+}
+func (s *serviceTestStore) UpdateRelationship(ctx context.Context, relationship models.Relationship) (*models.Relationship, error) {
+	s.createdRelationship = relationship
+	return &s.createdRelationship, nil
 }
 func (s *serviceTestStore) DeleteRelationship(ctx context.Context, id string) error {
 	return storage.ErrNotFound

@@ -73,10 +73,58 @@ func (api *API) Relationship(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, relationship)
+	case http.MethodPut, http.MethodPatch:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		actor, err := api.currentAccount(r)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		existing, err := api.services.Relationships.Get(r.Context(), id)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		if existing.NetworkID != "" {
+			if _, err := api.services.Networks.Get(r.Context(), actor, existing.NetworkID); err != nil {
+				writeServiceError(w, err)
+				return
+			}
+		}
+		var relationship models.Relationship
+		if err := decodeJSON(r, &relationship); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		updated, err := api.services.Relationships.Update(r.Context(), id, relationship)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, updated)
 	case http.MethodDelete:
 		if err := api.requireDataWrite(r); err != nil {
 			writeServiceError(w, err)
 			return
+		}
+		actor, err := api.currentAccount(r)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		existing, err := api.services.Relationships.Get(r.Context(), id)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		if existing.NetworkID != "" {
+			if _, err := api.services.Networks.Get(r.Context(), actor, existing.NetworkID); err != nil {
+				writeServiceError(w, err)
+				return
+			}
 		}
 		if err := api.services.Relationships.Delete(r.Context(), id); err != nil {
 			writeServiceError(w, err)

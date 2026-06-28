@@ -74,6 +74,7 @@ function buildNodeEl(node) {
   wrap.style.setProperty('--node-color', getNodeColor(node.entityType, node.data));
 
   if (node.data && node.data.deceased) wrap.classList.add('node-deceased');
+  if (graph.isNodeLocked(node.id)) wrap.classList.add('node-locked');
 
   const card = createEl('div', 'node-card');
 
@@ -118,6 +119,7 @@ function attachNodeEvents(wrap, node) {
     dragStarted = false;
 
     function onMove(ev) {
+      if (graph.isNodeLocked(node.id)) return;
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       if (!dragStarted && Math.hypot(dx, dy) < 4) return;
@@ -152,6 +154,12 @@ function attachNodeEvents(wrap, node) {
   wrap.addEventListener('dblclick', (e) => {
     e.stopPropagation();
     openEditModal(node.id);
+  });
+
+  wrap.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openNodeContextMenu(node.id, e.clientX, e.clientY);
   });
 }
 

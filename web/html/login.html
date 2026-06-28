@@ -310,7 +310,8 @@
       setMessage('Create the first owner account to enable login.', 'success');
       return;
     }
-    signup.hidden = true;
+    signup.hidden = false;
+    signup.textContent = 'Create account';
     switchTab('signin');
   }
 
@@ -320,7 +321,7 @@
       t.classList.toggle('active', t.dataset.tab === tab);
     });
     document.getElementById('btn-submit').textContent =
-      tab === 'signin' ? 'Sign in' : 'Create owner';
+      tab === 'signin' ? 'Sign in' : (needsOwner ? 'Create owner' : 'Create account');
     if (tab === 'signin' || !needsOwner) setMessage('');
   }
 
@@ -341,13 +342,13 @@
     }
 
     btn.disabled = true;
-    btn.textContent = currentTab === 'signin' ? 'Signing in...' : 'Creating owner...';
+    btn.textContent = currentTab === 'signin' ? 'Signing in...' : (needsOwner ? 'Creating owner...' : 'Creating account...');
     setMessage('');
 
     try {
       if (currentTab === 'signup') {
-        if (!needsOwner) throw new Error('Owner account already exists. Sign in instead.');
-        await api('/setup/owner', {
+        const path = needsOwner ? '/setup/owner' : '/auth/register';
+        await api(path, {
           method: 'POST',
           body: JSON.stringify({ email, display_name: email, password }),
         });
@@ -362,7 +363,7 @@
       setMessage(err.message || 'Authentication failed.', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = currentTab === 'signin' ? 'Sign in' : 'Create owner';
+      btn.textContent = currentTab === 'signin' ? 'Sign in' : (needsOwner ? 'Create owner' : 'Create account');
     }
   }
 

@@ -5,6 +5,7 @@ const canvas = (() => {
   let isPanning = false;
   let panStart = { x: 0, y: 0 };
   let spaceDown = false;
+  let userViewportChanged = false;
 
   const workspace = el('workspace');
   const inner = el('workspace-inner');
@@ -29,7 +30,12 @@ const canvas = (() => {
     };
   }
 
-  function fitToNodes(nodes) {
+  function markUserViewport(options) {
+    if (!options || options.user !== false) userViewportChanged = true;
+  }
+
+  function fitToNodes(nodes, options) {
+    markUserViewport(options);
     if (!nodes.length) {
       tx = 0; ty = 0; scale = 1;
       applyTransform();
@@ -54,8 +60,9 @@ const canvas = (() => {
     applyTransform();
   }
 
-  function centerOnNodes(nodes) {
+  function centerOnNodes(nodes, options) {
     if (!nodes.length) return;
+    markUserViewport(options);
     const rect = workspace.getBoundingClientRect();
     const cx = nodes.reduce((sum, node) => sum + node.x, 0) / nodes.length;
     const cy = nodes.reduce((sum, node) => sum + node.y, 0) / nodes.length;
@@ -64,7 +71,8 @@ const canvas = (() => {
     applyTransform();
   }
 
-  function setZoom(nextScale) {
+  function setZoom(nextScale, options) {
+    markUserViewport(options);
     const rect = workspace.getBoundingClientRect();
     const mx = rect.width / 2;
     const my = rect.height / 2;
@@ -79,7 +87,8 @@ const canvas = (() => {
     setZoom(scale * factor);
   }
 
-  function resetZoom() {
+  function resetZoom(options) {
+    markUserViewport(options);
     scale = 1;
     tx = 0;
     ty = 0;
@@ -94,6 +103,7 @@ const canvas = (() => {
 
   function onMouseMove(e) {
     if (!isPanning) return;
+    userViewportChanged = true;
     tx = e.clientX - panStart.x;
     ty = e.clientY - panStart.y;
     applyTransform();
@@ -107,6 +117,7 @@ const canvas = (() => {
 
   workspace.addEventListener('wheel', (e) => {
     e.preventDefault();
+    userViewportChanged = true;
     const rect = workspace.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -154,5 +165,7 @@ const canvas = (() => {
     resetZoom,
     applyTransform,
     getScale: () => scale,
+    hasUserViewport: () => userViewportChanged,
+    clearUserViewport: () => { userViewportChanged = false; },
   };
 })();

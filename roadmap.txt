@@ -1848,6 +1848,15 @@ Documentation checklist:
 * Update docs/neo4j.md if account, preference, lock, or relationship metadata storage changes.
 * Update roadmap.txt with completion notes when 0.13 is done.
 
+Completion notes:
+
+* 0.13 is complete as a development step.
+* Implemented top bar account menu, account administration, self-service account creation, network actions, HTML dialog replacements, relationship editing, duplicate suggestion dialog, Delete wording/icons, right-click context menus, grouped/collapsible toolbox including Data tools, drag-box selection, Select same type, frontend node locking, first-load graph framing, attribute empty/error states, browser-local color preferences, and shared date input validation.
+* Backend permission checks remain authoritative for account administration, network ownership, relationship edits, and network-scoped graph data.
+* Node locking is intentionally frontend-only in 0.13. Persistence should be designed with network-owned UI state before storing lock state.
+* Color preferences are intentionally browser-local and account-keyed in 0.13. Backend persistence should be decided later together with account-owned versus network-owned UI preferences.
+* Date fields accept `YYYY`, `YYYY-MM`, and `YYYY-MM-DD` in relationship and attribute dialogs.
+
 =============================================================================================================================================================================================
 0.14 Debug & Test - UI Foundation & Account Administration
 =============================================================================================================================================================================================
@@ -2550,105 +2559,340 @@ Documentation checklist:
 =============================================================================================================================================================================================
 
 Goal:
-Add configurable relationship rendering styles.
+Create a configurable graph rendering engine driven by Domain Definitions. The rendering engine should support multiple node and relationship styles while remaining independent of any specific domain.
 
 Scope:
-This version builds on Domain Definitions by making link rendering configurable per relationship type and domain. It should not introduce new domain modeling concepts beyond relationship rendering behavior.
+This version extends Domain Definitions with rendering behavior. Rendering should become configurable for nodes, relationships, labels, routing, interaction, and visual states without introducing new graph concepts.
 
-Implementation checklist:
+Implementation checklist
+Rendering engine:
+* Introduce a rendering abstraction layer.
+* Separate graph rendering from graph data.
+* Separate rendering logic from interaction logic.
+* Make rendering independent from Social Network assumptions.
+* Ensure rendering is driven by Domain Definitions.
 
-* Add relationship rendering mode support.
-* Support curved Bezier links.
-* Support straight point-to-point links.
-* Support orthogonal 90-degree links.
-* Support directed arrow links.
-* Support undirected line links.
-* Allow each relationship type to define its default rendering mode.
-* Allow each domain to define default relationship rendering behavior.
-* Keep existing Bezier rendering as the default for Social Network.
-* Add frontend rendering support for each configured relationship style.
-* Add fallback behavior for unknown or invalid relationship rendering settings.
+Node rendering:
+Allow node types to define:
+* shape
+* border style
+* fill color
+* icon
+* icon position
+* label position
+* compact mode
+* expanded mode
+* minimum size
+* preferred size
 
-Acceptance criteria:
+Support multiple node shapes:
+* rectangle
+* rounded rectangle
+* ellipse
+* diamond
+* hexagon
+* circle
+* custom SVG shape (future-ready)
 
-* Relationship styles can differ between domains.
-* Social Network keeps current visual behavior unless configured otherwise.
-* Flowchart can use directed orthogonal or straight arrows.
-* Invalid relationship style configuration falls back safely.
-* Relationship labels remain readable for all supported rendering modes.
-* Selection and deletion still work for all supported rendering modes.
+Relationship rendering
+Support rendering modes:
+* Bezier
+* straight
+* orthogonal
+* loop (self relationship)
+* Separate rendering style from semantic direction.
+
+Each relationship should independently define:
+* path style
+* direction
+* marker type
+* line style
+* thickness
+
+Relationship markers:
+Support:
+* none
+* arrow
+* double arrow
+* diamond
+* circle
+* filled circle
+* open arrow
+
+Future domains should be able to define custom markers.
+
+Line styles
+Support:
+* solid
+* dashed
+* dotted
+
+Allow configurable line width.
+
+Relationship routing:
+* Support automatic endpoint selection.
+* Support fixed endpoints.
+
+Possible anchor positions:
+* center
+* top
+* bottom
+* left
+* right
+* automatic
+* Add basic routing around node borders.
+* Prepare routing engine for obstacle avoidance in later versions.
+
+Multiple relationships:
+Support multiple relationships between identical node pairs.
+
+The renderer should:
+* offset links
+* separate labels
+* avoid overlapping curves where practical
+
+Self relationships:
+Support node-to-self relationships using loop rendering.
+
+Labels:
+Allow each relationship definition to configure:
+* label visibility
+* label placement
+* label orientation
+
+Support placement:
+* middle
+* source
+* target
+* above
+* below
+
+Avoid placing labels underneath nodes whenever possible.
+
+Rendering states:
+Support independent rendering for:
+* normal
+* hover
+* selected
+* disabled
+* hidden
+* locked
+* invalid
+
+Interaction:
+Improve relationship interaction.
+* Increase clickable hit area independently from visible line width.
+* Show preview relationship while creating links.
+* Use domain rendering style during preview.
+* Preserve selection behavior for all rendering styles.
+
+Viewport:
+Ensure rendering supports:
+* zoom
+* pan
+* fit all
+* fit selection
+without visual artifacts.
+
+Export preparation:
+Do not implement export yet.
+However:
+
+* separate path generation from DOM rendering
+* make rendering reusable for future
+* SVG export
+* PNG export
+* PDF export
+* printing
+
+Performance:
+Review rendering performance.
+Avoid unnecessary redraws.
+
+Only redraw:
+* moved nodes
+* affected relationships
+* changed labels
+when possible.
+
+Acceptance criteria_
+* Rendering is independent of domain implementation.
+* Social Network uses Bezier rendering by default.
+* Flowchart can use orthogonal rendering.
+* Different domains can define different node shapes.
+* Different domains can define different relationship styles.
+* Multiple relationships between identical nodes render correctly.
+* Self relationships render correctly.
+* Relationship labels remain readable.
+* Labels avoid overlapping nodes where practical.
+* Relationship previews use the correct domain style.
+* Relationship hit areas remain easy to click.
+* Selection works for every rendering style.
+* Rendering remains smooth during pan and zoom.
+* Rendering architecture is reusable for export in later versions.
 
 Test checklist:
-
 * Run go test ./...
 * Run go vet ./...
 * Run frontend JavaScript syntax checks.
-* Test curved Bezier links.
-* Test straight point-to-point links.
-* Test orthogonal 90-degree links.
-* Test directed arrow links.
-* Test undirected line links.
-* Test mixed styles in one graph if supported.
-* Test Social Network default rendering.
-* Test Flowchart default rendering.
-* Test invalid style fallback.
-* Test relationship click/delete behavior for each style.
-* Test browser reload after changing or loading relationship style configuration.
+* Test rectangle nodes.
+* Test ellipse nodes.
+* Test diamond nodes.
+* Test rounded nodes.
+* Test Bezier relationships.
+* Test straight relationships.
+* Test orthogonal relationships.
+* Test self relationships.
+* Test arrow markers.
+* Test diamond markers.
+* Test circle markers.
+* Test solid lines.
+* Test dashed lines.
+* Test dotted lines.
+* Test multiple relationships between identical nodes.
+* Test relationship labels in every placement mode.
+* Test automatic endpoint selection.
+* Test fixed endpoint selection.
+* Test relationship preview while creating links.
+* Test hover state.
+* Test selected state.
+* Test hidden state.
+* Test locked state.
+* Test invalid state.
+* Test zoom.
+* Test pan.
+* Test fit all.
+* Test fit selection.
+* Test browser reload after rendering changes.
+* Test rendering performance with large graphs.
 
 Documentation checklist:
-
-* Update docs/domain-definition.md with relationship rendering style configuration.
-* Update docs/ui-concept.md with link rendering behavior.
-* Update docs/frontend-smoke-test.md with relationship style checks.
+* Update docs/domain-definition.md with rendering configuration.
+* Update docs/ui-concept.md with rendering architecture.
+* Update docs/frontend-smoke-test.md with rendering tests.
+* Document supported node shapes.
+* Document supported relationship styles.
+* Document supported marker types.
+* Document rendering state model.
+* Document rendering performance considerations.
 * Update roadmap.txt with 0.19 completion notes.
+
 =============================================================================================================================================================================================
-0.20 Debug - Relationship Rendering
+0.20 Debug & Test - Graph Rendering Engine
 =============================================================================================================================================================================================
 
 Goal:
-Stabilize configurable relationship rendering styles from 0.19 before adding operational tooling.
+Stabilize the graph rendering engine introduced in 0.19 before later features such as export, print, presentation modes, timeline views, and advanced graph interaction build upon it.
 
 Scope:
-This version should focus on testing link rendering, relationship selection, deletion, labels, reload behavior, and domain-specific rendering defaults. No new graph engine concepts should be added here.
+This version focuses on rendering stability, routing, interaction, performance, and validation. No new rendering concepts should be introduced unless required to complete or stabilize the 0.19 implementation.
 
 Implementation checklist:
 
-* Add repeatable tests or smoke checks for every relationship rendering mode.
-* Verify Bezier links remain the Social Network default.
-* Verify Flowchart can use directed straight or orthogonal links.
-* Verify relationship labels remain readable for all link styles.
-* Verify relationship click, selection, edit, and delete behavior for all link styles.
-* Verify invalid relationship style configuration falls back safely.
-* Verify domain-specific relationship style defaults do not break existing networks.
-* Update documentation after test findings.
+* Review all rendering behavior introduced in 0.19.
+* Verify rendering remains independent from graph data.
+* Verify rendering remains independent from Social Network specific behavior.
+* Stabilize node rendering.
+* Stabilize relationship rendering.
+* Stabilize label rendering.
+* Stabilize routing behavior.
+* Stabilize rendering state handling.
+* Verify node shape rendering.
+* Verify relationship marker rendering.
+* Verify line style rendering.
+* Verify relationship label placement.
+* Verify relationship endpoint calculations.
+* Verify automatic anchor selection.
+* Verify fixed anchor selection.
+* Verify multiple relationships between the same nodes.
+* Verify self relationship rendering.
+* Verify relationship preview rendering.
+* Verify rendering while dragging nodes.
+* Verify rendering during zoom.
+* Verify rendering during pan.
+* Verify rendering after fit all.
+* Verify rendering after fit selection.
+* Verify rendering after browser resize.
+* Verify rendering after network reload.
+* Verify rendering after domain switch.
+* Verify rendering fallback behavior for invalid rendering configuration.
+* Verify rendering fallback behavior for invalid node definitions.
+* Verify rendering fallback behavior for invalid relationship definitions.
+* Verify click targets remain usable regardless of visible line width.
+* Verify rendering updates only affected graph elements when practical.
+* Review rendering performance with larger graphs.
+* Update documentation after debug findings.
 
 Acceptance criteria:
 
-* Relationship rendering is stable enough for later graph engine work.
-* Existing Social Network graphs still render as expected.
-* Flowchart-style graphs can render directional relationships clearly.
-* Invalid rendering configuration does not crash the UI.
+* Rendering behaves consistently across supported domains.
+* Graph rendering remains independent from domain-specific logic.
+* Node rendering is stable.
+* Relationship rendering is stable.
+* Labels remain readable.
+* Labels avoid overlapping nodes where practical.
+* Relationship routing remains visually consistent.
+* Multiple relationships between the same nodes remain distinguishable.
+* Self relationships render correctly.
+* Relationship previews use the correct rendering style.
+* Hover, selection, hidden, locked, disabled, and invalid states render correctly.
+* Rendering remains stable during zoom, pan, node movement, and viewport changes.
+* Invalid rendering configuration falls back safely.
+* Rendering performance is sufficient for normal graph editing.
+* Rendering architecture is suitable for later export and print functionality.
 
 Test checklist:
 
 * Run go test ./...
 * Run go vet ./...
 * Run frontend JavaScript syntax checks.
-* Test Bezier links.
-* Test straight links.
-* Test orthogonal 90-degree links.
-* Test directed arrows.
-* Test undirected lines.
-* Test mixed relationship styles if supported.
-* Test relationship label placement.
-* Test relationship click and delete behavior.
-* Test browser reload after loading styled relationships.
+* Test rectangle node rendering.
+* Test rounded rectangle node rendering.
+* Test ellipse node rendering.
+* Test diamond node rendering.
+* Test every supported node shape.
+* Test Bezier relationship rendering.
+* Test straight relationship rendering.
+* Test orthogonal relationship rendering.
+* Test self relationship rendering.
+* Test every supported relationship marker.
+* Test solid line rendering.
+* Test dashed line rendering.
+* Test dotted line rendering.
+* Test relationship thickness variations if implemented.
+* Test relationship label placement at every supported position.
+* Test automatic endpoint selection.
+* Test fixed endpoint selection.
+* Test multiple relationships between identical node pairs.
+* Test relationship preview while creating a relationship.
+* Test relationship rendering while moving nodes.
+* Test hover rendering.
+* Test selected rendering.
+* Test hidden rendering.
+* Test locked rendering.
+* Test disabled rendering.
+* Test invalid rendering.
+* Test graph zoom.
+* Test graph pan.
+* Test fit all.
+* Test fit selection.
+* Test browser resize.
+* Test browser reload.
+* Test network reload.
+* Test switching between supported domains.
+* Test invalid rendering configuration.
+* Test invalid node rendering configuration.
+* Test invalid relationship rendering configuration.
+* Test rendering performance using larger graphs.
+* Restart MATE and confirm rendering configuration behaves consistently.
 
 Documentation checklist:
 
-* Update docs/domain-definition.md after 0.20 findings.
-* Update docs/ui-concept.md after 0.20 findings.
-* Update docs/frontend-smoke-test.md with final link rendering checks.
+* Update docs/domain-definition.md after rendering stabilization.
+* Update docs/ui-concept.md with finalized rendering behavior.
+* Update docs/frontend-smoke-test.md with finalized rendering tests.
+* Update docs/storage.md if rendering configuration persistence changed.
+* Update docs/api.md if rendering configuration became API-visible.
 * Update roadmap.txt with 0.20 completion notes.
 
 =============================================================================================================================================================================================

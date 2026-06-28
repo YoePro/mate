@@ -25,6 +25,7 @@ func createRouter(store storage.Storage) *http.ServeMux {
 
 	mux.HandleFunc("/api/v1/setup/status", api.SetupStatus)
 	mux.HandleFunc("/api/v1/setup/owner", api.SetupOwner)
+	mux.HandleFunc("/api/v1/auth/register", api.Register)
 	mux.HandleFunc("/api/v1/auth/login", api.Login)
 	mux.HandleFunc("/api/v1/auth/logout", api.Logout)
 	mux.HandleFunc("/api/v1/auth/me", api.Me)

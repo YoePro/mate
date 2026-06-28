@@ -65,6 +65,25 @@ func (api *API) SetupOwner(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, account)
 }
 
+// Register creates a self-service account after owner bootstrap.
+func (api *API) Register(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req accountRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	account, err := api.services.Accounts.Register(r.Context(), accountInput(req))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, account)
+}
+
 // Login creates a persisted session and sets the session cookie.
 func (api *API) Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
