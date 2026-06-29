@@ -12,8 +12,10 @@ This document summarizes implemented product features at the start of 0.12 stabi
 ## Networks
 
 - Users can create and rename owned networks.
+- Networks store a `domain` metadata field.
+- Supported 0.15 domains are `social` and experimental `flowchart`.
 - Users can list owned networks.
-- Users can search discoverable network metadata without receiving edit access.
+- Users can search discoverable network metadata, including domain metadata, without receiving edit access.
 - Network graph data is scoped to the selected owned network.
 - Person membership, notes, context, and positions are network-scoped.
 - Non-owners cannot edit another user's network.
@@ -47,6 +49,10 @@ This document summarizes implemented product features at the start of 0.12 stabi
 
 - Grouped toolbox areas for Navigation, Selection, Graph, and Create.
 - Icon-based Create tools for person genders, organization subtypes, and project.
+- The Create toolbox filters available tools by selected network domain.
+- Flowchart domain exposes Start, Stop, Process, Decision, Input, Output, Merge, and Delay create tools.
+- Flowchart nodes are stored as network-scoped diagram nodes.
+- Flowchart relationships have first-pass visual styling by relationship type.
 - Person node colors reflect gender:
   - `m`: blue
   - `f`: pink

@@ -17,6 +17,11 @@ const (
 	RelationshipSponsors  RelationshipType = "sponsors"
 	RelationshipPartnerOf RelationshipType = "partner_of"
 	RelationshipOwns      RelationshipType = "owns"
+	RelationshipNext      RelationshipType = "next"
+	RelationshipYes       RelationshipType = "yes"
+	RelationshipNo        RelationshipType = "no"
+	RelationshipLoop      RelationshipType = "loop"
+	RelationshipError     RelationshipType = "error"
 )
 
 // Relationship represents a connection between two nodes.

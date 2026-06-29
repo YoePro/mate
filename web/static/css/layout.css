@@ -52,7 +52,8 @@
   min-width: 320px;
 }
 
-.network-select {
+.network-select,
+.domain-select {
   width: 180px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -63,7 +64,12 @@
   outline: none;
 }
 
-.network-select:focus {
+.domain-select {
+  width: 138px;
+}
+
+.network-select:focus,
+.domain-select:focus {
   border-color: var(--accent);
 }
 

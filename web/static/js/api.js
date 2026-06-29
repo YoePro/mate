@@ -32,6 +32,7 @@ function entityPath(entityType) {
   if (entityType === 'person')                          return 'persons';
   if (API_ORGANIZATION_TYPES.includes(entityType)) return 'organizations';
   if (entityType === 'project')                       return 'projects';
+  if (entityType.startsWith('flow_'))                  return 'diagram-nodes';
   if (entityType === 'location')                        return 'locations';
   if (entityType === 'tag')                             return 'tags';
   return entityType + 's';
@@ -39,6 +40,13 @@ function entityPath(entityType) {
 
 async function apiCreate(entityType, data) {
   const body = Object.assign({}, data);
+  if (entityType.startsWith('flow_') && window.currentNetworkId) {
+    body.type = entityType;
+    return apiFetch('/networks/' + window.currentNetworkId + '/diagram-nodes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
   if (entityType === 'person' && window.currentNetworkId) {
     const result = await apiFetch('/networks/' + window.currentNetworkId + '/persons', {
       method: 'POST',
@@ -53,10 +61,18 @@ async function apiCreate(entityType, data) {
 }
 
 async function apiUpdate(entityType, id, data) {
+  if (entityType.startsWith('flow_') && window.currentNetworkId) {
+    const body = Object.assign({ type: entityType }, data);
+    return apiFetch('/networks/' + window.currentNetworkId + '/diagram-nodes/' + id, { method: 'PUT', body: JSON.stringify(body) });
+  }
   return apiFetch('/' + entityPath(entityType) + '/' + id, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 async function apiDelete(entityType, id) {
+  if (entityType.startsWith('flow_') && window.currentNetworkId) {
+    await apiFetch('/networks/' + window.currentNetworkId + '/diagram-nodes/' + id, { method: 'DELETE' });
+    return;
+  }
   if (entityType === 'person' && window.currentNetworkId) {
     await apiFetch('/networks/' + window.currentNetworkId + '/persons/' + id + '/archive', { method: 'POST' });
     return;
@@ -73,6 +89,7 @@ async function apiLoadAll() {
       })),
       organizations: networkGraph.organizations || [],
       projects: networkGraph.projects || [],
+      diagram_nodes: networkGraph.diagram_nodes || [],
       locations: [],
       tags: [],
       relationships: networkGraph.relationships || [],

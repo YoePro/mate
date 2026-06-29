@@ -6,6 +6,7 @@ type Network struct {
 	OwnerID     string `json:"owner_id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	Domain      string `json:"domain,omitempty"`
 	Archived    bool   `json:"archived,omitempty"`
 }
 
@@ -14,6 +15,7 @@ type NetworkSearchResult struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	Domain      string `json:"domain,omitempty"`
 	Owned       bool   `json:"owned"`
 	CanEdit     bool   `json:"can_edit"`
 }
@@ -39,6 +41,7 @@ type NetworkGraphResponse struct {
 	Persons                 []NetworkPerson          `json:"persons"`
 	Organizations           []Organization           `json:"organizations"`
 	Projects                []Project                `json:"projects"`
+	DiagramNodes            []DiagramNode            `json:"diagram_nodes,omitempty"`
 	Relationships           []Relationship           `json:"relationships"`
 	Positions               []Position               `json:"positions"`
 	CustomRelationshipTypes []CustomRelationshipType `json:"custom_relationship_types,omitempty"`

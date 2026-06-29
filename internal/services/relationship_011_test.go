@@ -17,6 +17,11 @@ func TestValidRelationshipType_AllowsBuiltInsAndCustomTypes(t *testing.T) {
 		models.RelationshipSponsors,
 		models.RelationshipPartnerOf,
 		models.RelationshipOwns,
+		models.RelationshipNext,
+		models.RelationshipYes,
+		models.RelationshipNo,
+		models.RelationshipLoop,
+		models.RelationshipError,
 		models.RelationshipType("custom_hates"),
 		models.RelationshipType("custom_advises_2026"),
 	}
@@ -181,10 +186,95 @@ func TestNetworkService_CreateCustomRelationshipTypeRequiresNetworkOwner(t *test
 	}
 }
 
+func TestNetworkService_DomainRelationshipValidation(t *testing.T) {
+	actor := &models.Account{ID: "owner-1", Role: models.RoleOwner}
+
+	socialStore := &serviceTestStore{
+		network: models.Network{ID: "network-1", OwnerID: "owner-1", Name: "Social", Domain: "social"},
+	}
+	socialService := &NetworkService{store: socialStore}
+	err := socialService.ValidateRelationshipForNetwork(context.Background(), actor, models.Relationship{
+		NetworkID:  "network-1",
+		SourceID:   "flow-1",
+		SourceType: "flow_process",
+		TargetID:   "flow-2",
+		TargetType: "flow_decision",
+		Type:       models.RelationshipNext,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for flowchart relationship in social network, got %v", err)
+	}
+
+	flowStore := &serviceTestStore{
+		network: models.Network{ID: "network-2", OwnerID: "owner-1", Name: "Flow", Domain: "flowchart"},
+		diagramNodes: []models.DiagramNode{
+			{ID: "flow-1", NetworkID: "network-2", Type: "flow_process", Name: "Process"},
+			{ID: "flow-2", NetworkID: "network-2", Type: "flow_decision", Name: "Decision"},
+		},
+	}
+	flowService := &NetworkService{store: flowStore}
+	err = flowService.ValidateRelationshipForNetwork(context.Background(), actor, models.Relationship{
+		NetworkID:  "network-2",
+		SourceID:   "flow-1",
+		SourceType: "flow_process",
+		TargetID:   "flow-2",
+		TargetType: "flow_decision",
+		Type:       models.RelationshipNext,
+	})
+	if err != nil {
+		t.Fatalf("expected valid flowchart relationship, got %v", err)
+	}
+
+	err = flowService.ValidateRelationshipForNetwork(context.Background(), actor, models.Relationship{
+		NetworkID:  "network-2",
+		SourceID:   "person-1",
+		SourceType: "person",
+		TargetID:   "person-2",
+		TargetType: "person",
+		Type:       models.RelationshipKnows,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for social relationship in flowchart network, got %v", err)
+	}
+}
+
+func TestNetworkService_DiagramNodesRequireFlowchartDomain(t *testing.T) {
+	service := &NetworkService{store: &serviceTestStore{
+		network: models.Network{ID: "network-1", OwnerID: "owner-1", Name: "Social", Domain: "social"},
+	}}
+
+	_, err := service.CreateDiagramNode(context.Background(),
+		&models.Account{ID: "owner-1", Role: models.RoleOwner},
+		"network-1",
+		models.DiagramNode{Type: "flow_process", Name: "Process"},
+	)
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for diagram node in social network, got %v", err)
+	}
+}
+
+func TestNetworkService_AddPersonRequiresSocialDomain(t *testing.T) {
+	service := &NetworkService{store: &serviceTestStore{
+		network: models.Network{ID: "network-1", OwnerID: "owner-1", Name: "Flow", Domain: "flowchart"},
+	}}
+
+	_, err := service.AddPerson(context.Background(),
+		&models.Account{ID: "owner-1", Role: models.RoleOwner},
+		"network-1",
+		models.Person{Name: "Kalle Anka", Gender: "m"},
+		models.NetworkPersonContext{},
+	)
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for person in flowchart network, got %v", err)
+	}
+}
+
 type serviceTestStore struct {
 	needsOwner                bool
 	network                   models.Network
 	accounts                  []models.Account
+	diagramNodes              []models.DiagramNode
+	createdDiagramNode        models.DiagramNode
 	createdRelationship       models.Relationship
 	createdCustomRelationship models.CustomRelationshipType
 }
@@ -282,6 +372,29 @@ func (s *serviceTestStore) SaveNetworkPosition(ctx context.Context, networkID st
 }
 func (s *serviceTestStore) GetNetworkGraph(ctx context.Context, networkID string) (*models.NetworkGraphResponse, error) {
 	return nil, storage.ErrNotFound
+}
+func (s *serviceTestStore) CreateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error) {
+	s.createdDiagramNode = node
+	s.diagramNodes = append(s.diagramNodes, node)
+	return &s.createdDiagramNode, nil
+}
+func (s *serviceTestStore) GetDiagramNode(ctx context.Context, networkID string, id string) (*models.DiagramNode, error) {
+	for _, node := range s.diagramNodes {
+		if node.NetworkID == networkID && node.ID == id {
+			return &node, nil
+		}
+	}
+	if s.createdDiagramNode.NetworkID == networkID && s.createdDiagramNode.ID == id {
+		return &s.createdDiagramNode, nil
+	}
+	return nil, storage.ErrNotFound
+}
+func (s *serviceTestStore) UpdateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error) {
+	s.createdDiagramNode = node
+	return &s.createdDiagramNode, nil
+}
+func (s *serviceTestStore) DeleteDiagramNode(ctx context.Context, networkID string, id string) error {
+	return nil
 }
 func (s *serviceTestStore) CreateCustomRelationshipType(ctx context.Context, relationshipType models.CustomRelationshipType) (*models.CustomRelationshipType, error) {
 	s.createdCustomRelationship = relationshipType

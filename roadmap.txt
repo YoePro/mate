@@ -2052,6 +2052,10 @@ Implementation checklist:
   * Merge
   * Delay
 
+* Treat Flowchart and diagram-only nodes as network-local artefacts.
+* Delete Flowchart and diagram-only nodes physically instead of archiving them.
+* Deleting a Flowchart node must also remove its network-scoped relationships and saved position.
+
 * Flowchart relationship types may include:
 
   * next
@@ -2080,6 +2084,8 @@ Implementation checklist:
 * Ensure Flowchart or other diagram-only domains do not trigger Person or Organization duplicate detection.
 * Ensure global identity search is not run implicitly for diagram-only nodes.
 * Ensure domain-specific search is scoped to relevant node types.
+* Ensure backend validation enforces domain-specific node and relationship rules.
+* Render multiple relationships between the same two nodes as separated links instead of overlapping paths.
 * Ensure network discovery can show or filter by domain metadata when available.
 * Ensure non-owned network search results expose only safe metadata.
 * Ensure existing account, role, and network ownership rules remain authoritative.
@@ -2594,6 +2600,16 @@ Support multiple node shapes:
 * circle
 * custom SVG shape (future-ready)
 
+Flowchart rendering:
+* Flowchart nodes should not use the generic circular Social Network node shape.
+* Flowchart node shape should follow the node type where practical:
+  * Start / Stop: terminator shape
+  * Process: rectangle
+  * Decision: diamond
+  * Input / Output: parallelogram
+  * Merge: merge/join shape
+  * Delay: delay shape
+
 Relationship rendering
 Support rendering modes:
 * Bezier
@@ -2720,6 +2736,7 @@ Acceptance criteria_
 * Social Network uses Bezier rendering by default.
 * Flowchart can use orthogonal rendering.
 * Different domains can define different node shapes.
+* Flowchart nodes render with flowchart-appropriate shapes rather than circles.
 * Different domains can define different relationship styles.
 * Multiple relationships between identical nodes render correctly.
 * Self relationships render correctly.

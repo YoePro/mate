@@ -114,6 +114,23 @@ const COLOR_PREFERENCES = [
   ['--node-project', 'Project', '#22c55e'],
 ];
 
+const NETWORK_DOMAINS = {
+  social: 'Social Network',
+  flowchart: 'Flowchart',
+};
+
+function normalizeDomain(domain) {
+  return NETWORK_DOMAINS[domain] ? domain : 'social';
+}
+
+function currentDomain() {
+  return normalizeDomain(currentNetwork && currentNetwork.domain);
+}
+
+function domainLabel(domain) {
+  return NETWORK_DOMAINS[normalizeDomain(domain)];
+}
+
 async function boot() {
   currentAccount = await requireAccount();
   if (!currentAccount) return;
@@ -171,6 +188,15 @@ async function loadGraph() {
       return;
     }
     const data = await apiLoadAll();
+    if (data.network && currentNetwork && data.network.id === currentNetwork.id) {
+      currentNetwork = Object.assign({}, currentNetwork, data.network, {
+        domain: normalizeDomain(data.network.domain),
+      });
+      ownedNetworks = ownedNetworks.map(network => network.id === currentNetwork.id ? currentNetwork : network);
+      renderNetworkOptions(ownedNetworks, currentNetwork.id);
+      updateDomainUI();
+      updateNetworkActions();
+    }
     currentCustomRelationshipTypes = data.custom_relationship_types || [];
     graph.load(data);
     renderAllNodes();
@@ -198,6 +224,7 @@ function frameLoadedGraph(networkChanged) {
 
 async function initNetworks() {
   const select = el('network-select');
+  const domainSelect = el('domain-select');
   const createBtn = el('btn-new-network');
   const renameBtn = el('btn-rename-network');
   createBtn.addEventListener('click', () => openNetworkModal('create'));
@@ -209,6 +236,7 @@ async function initNetworks() {
     setCurrentNetwork(selected || null);
     await loadGraph();
   });
+  domainSelect.addEventListener('change', handleDomainSelectChange);
   initNetworkSearch();
   await refreshNetworks();
 }
@@ -267,6 +295,7 @@ function openNetworkModal(mode) {
   const title = el('network-modal-title');
   const name = el('network-modal-name');
   const description = el('network-modal-description');
+  const domain = el('network-modal-domain');
   const save = el('network-modal-save');
   const danger = el('network-modal-danger');
   const fields = el('network-form-fields');
@@ -277,18 +306,22 @@ function openNetworkModal(mode) {
   fields.style.display = '';
   name.disabled = false;
   description.disabled = false;
+  domain.disabled = false;
 
   if (mode === 'create') {
     title.textContent = 'Create Network';
     name.value = '';
     description.value = '';
+    domain.value = currentDomain();
     save.textContent = 'Create';
   } else if (mode === 'archive') {
     title.textContent = 'Delete Network';
     name.value = currentNetwork.name || '';
     description.value = currentNetwork.description || '';
+    domain.value = currentDomain();
     name.disabled = true;
     description.disabled = true;
+    domain.disabled = true;
     save.style.display = 'none';
     danger.style.display = '';
     setDeleteButton(danger, 'Delete');
@@ -297,6 +330,7 @@ function openNetworkModal(mode) {
     title.textContent = mode === 'metadata' ? 'Edit Network Metadata' : 'Rename Network';
     name.value = currentNetwork.name || '';
     description.value = currentNetwork.description || '';
+    domain.value = currentDomain();
     save.textContent = 'Save';
   }
 
@@ -320,6 +354,7 @@ function setNetworkModalMessage(message, type) {
 async function handleNetworkModalSave() {
   const name = el('network-modal-name').value.trim();
   const description = el('network-modal-description').value.trim();
+  const domain = normalizeDomain(el('network-modal-domain').value);
   if (!name) {
     setNetworkModalMessage('Network name is required.', 'error');
     el('network-modal-name').focus();
@@ -329,7 +364,7 @@ async function handleNetworkModalSave() {
   el('network-modal-save').disabled = true;
   try {
     if (networkModalMode === 'create') {
-      const network = await apiCreateNetwork({ name, description });
+      const network = await apiCreateNetwork({ name, description, domain });
       ownedNetworks = await apiListNetworks();
       renderNetworkOptions(ownedNetworks, network.id);
       setCurrentNetwork(network);
@@ -340,10 +375,11 @@ async function handleNetworkModalSave() {
     }
 
     if (!currentNetwork) return;
-    const updated = await apiUpdateNetwork(currentNetwork.id, { name, description });
+    const updated = await apiUpdateNetwork(currentNetwork.id, { name, description, domain });
     ownedNetworks = ownedNetworks.map(network => network.id === updated.id ? updated : network);
     renderNetworkOptions(ownedNetworks, updated.id);
     setCurrentNetwork(updated);
+    await loadGraph();
     closeNetworkModal();
   } catch (err) {
     console.error('Network save failed:', err);
@@ -381,7 +417,7 @@ async function handleNetworkModalArchive() {
 async function refreshNetworks() {
   ownedNetworks = await apiListNetworks();
   if (!ownedNetworks.length && currentAccount && currentAccount.role !== 'viewer') {
-    const created = await apiCreateNetwork({ name: 'Default network' });
+    const created = await apiCreateNetwork({ name: 'Default network', domain: 'social' });
     ownedNetworks.push(created);
   }
   const savedID = window.localStorage.getItem('mate.currentNetworkId');
@@ -398,6 +434,8 @@ function updateNetworkActions() {
   if (createBtn) createBtn.disabled = !canWrite;
   if (renameBtn) renameBtn.disabled = !canWrite || !currentNetwork;
   if (actionsBtn) actionsBtn.disabled = !canWrite;
+  const domainSelect = el('domain-select');
+  if (domainSelect) domainSelect.disabled = !canWrite || !currentNetwork;
   qsa('[data-network-action]').forEach(item => {
     const action = item.dataset.networkAction;
     const needsCurrent = action === 'rename' || action === 'metadata' || action === 'archive';
@@ -421,7 +459,7 @@ function renderNetworkOptions(networks, selectedID) {
   networks.forEach(network => {
     const option = createEl('option', '');
     option.value = network.id;
-    option.textContent = network.name;
+    option.textContent = `${network.name} - ${domainLabel(network.domain)}`;
     option.selected = network.id === selectedID;
     select.appendChild(option);
   });
@@ -429,13 +467,44 @@ function renderNetworkOptions(networks, selectedID) {
 
 function setCurrentNetwork(network) {
   currentNetwork = network;
+  if (currentNetwork) currentNetwork.domain = normalizeDomain(currentNetwork.domain);
   window.currentNetworkId = network ? network.id : null;
   if (window.currentNetworkId) {
     window.localStorage.setItem('mate.currentNetworkId', window.currentNetworkId);
   } else {
     window.localStorage.removeItem('mate.currentNetworkId');
   }
+  updateDomainUI();
   updateNetworkActions();
+}
+
+function updateDomainUI() {
+  const domainSelect = el('domain-select');
+  if (domainSelect) domainSelect.value = currentDomain();
+  if (typeof updateToolboxDomain === 'function') updateToolboxDomain();
+}
+
+async function handleDomainSelectChange() {
+  if (!canWriteData() || !currentNetwork) {
+    updateDomainUI();
+    return;
+  }
+  const domain = normalizeDomain(el('domain-select').value);
+  try {
+    const updated = await apiUpdateNetwork(currentNetwork.id, {
+      name: currentNetwork.name,
+      description: currentNetwork.description || '',
+      domain,
+    });
+    ownedNetworks = ownedNetworks.map(network => network.id === updated.id ? updated : network);
+    renderNetworkOptions(ownedNetworks, updated.id);
+    setCurrentNetwork(updated);
+    await loadGraph();
+  } catch (err) {
+    console.error('Domain update failed:', err);
+    updateDomainUI();
+    await openMessageDialog('Domain Save Failed', 'Could not update network domain.');
+  }
 }
 
 function initNetworkSearch() {
@@ -489,7 +558,7 @@ function showNetworkResults(results) {
     const name = createEl('span', 'network-result-name');
     name.textContent = result.name || 'Untitled network';
     const meta = createEl('span', 'network-result-meta');
-    meta.textContent = result.owned ? 'Owned by you' : 'Discoverable - no access';
+    meta.textContent = `${domainLabel(result.domain)} - ${result.owned ? 'Owned by you' : 'Discoverable - no access'}`;
     item.appendChild(name);
     item.appendChild(meta);
     if (result.description) {
@@ -776,9 +845,16 @@ function openRelationshipContextMenu(linkId, x, y) {
 
 function openCanvasContextMenu(x, y) {
   const pos = canvas.screenToWorld(x, y);
+  const domain = currentDomain();
+  const createPrimary = domain === 'flowchart'
+    ? { label: 'Create process here', disabled: !canWriteData(), action: () => openAddModal('flow_process', pos.x, pos.y) }
+    : { label: 'Create person here', disabled: !canWriteData(), action: () => openAddModal('person', pos.x, pos.y) };
+  const createSecondary = domain === 'flowchart'
+    ? { label: 'Create decision here', disabled: !canWriteData(), action: () => openAddModal('flow_decision', pos.x, pos.y) }
+    : { label: 'Create organization here', disabled: true };
   openContextMenu([
-    { label: 'Create person here', disabled: !canWriteData(), action: () => openAddModal('person', pos.x, pos.y) },
-    { label: 'Create organization here', disabled: true },
+    createPrimary,
+    createSecondary,
     { label: 'Paste', disabled: true },
     { separator: true },
     { label: 'Fit all nodes', action: () => canvas.fitToNodes(graph.nodes.filter(node => !graph.isNodeHidden(node.id))) },
@@ -892,6 +968,7 @@ function applyColorPreferences(values) {
   COLOR_PREFERENCES.forEach(([variable, , fallback]) => {
     root.style.setProperty(variable, values && values[variable] ? values[variable] : fallback);
   });
+  if (typeof updateToolboxIconColors === 'function') updateToolboxIconColors();
   renderAllNodes();
 }
 
@@ -1386,6 +1463,14 @@ const FORM_FIELDS = {
     { key: 'web', label: 'Web / Reference', type: 'text' },
     { key: 'notes', label: 'Notes', type: 'textarea' },
   ],
+  flow_start: [{ key: 'name', label: 'Start label', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_stop: [{ key: 'name', label: 'Stop label', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_process: [{ key: 'name', label: 'Process name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_decision: [{ key: 'name', label: 'Decision', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_input: [{ key: 'name', label: 'Input name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_output: [{ key: 'name', label: 'Output name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_merge: [{ key: 'name', label: 'Merge name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+  flow_delay: [{ key: 'name', label: 'Delay name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
   location:    [{ key: 'name', label: 'Location name',    type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'textarea' }],
   tag:         [{ key: 'name', label: 'Tag name',         type: 'text', required: true }],
 };
@@ -1469,6 +1554,25 @@ const RELATIONSHIP_OPTIONS = {
   'organization:project': [
     ['sponsors', 'Sponsors'],
   ],
+  'flow_start:flow_process': [
+    ['next', 'Next'],
+  ],
+  'flow_process:flow_process': [
+    ['next', 'Next'],
+    ['loop', 'Loop'],
+    ['error', 'Error'],
+  ],
+  'flow_process:flow_decision': [
+    ['next', 'Next'],
+  ],
+  'flow_decision:flow_process': [
+    ['yes', 'Yes'],
+    ['no', 'No'],
+    ['loop', 'Loop'],
+  ],
+  'flow_process:flow_stop': [
+    ['next', 'Next'],
+  ],
 };
 
 const RELATIONSHIP_CONTEXT_TYPES = new Set([
@@ -1491,6 +1595,7 @@ function initModals() {
 
 function openAddModal(entityType, x, y, defaults) {
   if (!canWriteData()) return;
+  if (typeof entityAllowedInCurrentDomain === 'function' && !entityAllowedInCurrentDomain(entityType)) return;
   modalEntityType = entityType;
   modalEntityId = null;
   modalX = x;
@@ -1611,7 +1716,7 @@ async function handleModalSave() {
         result = createTemporaryEntity(modalEntityType, data);
       } else {
         try {
-          if (modalEntityType === 'person' && window.currentNetworkId) {
+          if (modalEntityType === 'person' && currentDomain() === 'social' && window.currentNetworkId) {
             el('modal-overlay').classList.add('modal-hidden');
             const duplicateResult = await maybeUseExistingPerson(data);
             if (duplicateResult && duplicateResult.cancelled) {
@@ -1817,12 +1922,22 @@ function broadEntityType(entityType) {
   if (entityType === 'person') return 'person';
   if (isOrganizationEntityType(entityType)) return 'organization';
   if (entityType === 'project') return 'project';
+  if (entityType.startsWith('flow_')) return entityType;
   if (entityType === 'location') return 'location';
   if (entityType === 'tag') return 'tag';
   return entityType;
 }
 
 function relationshipOptionsFor(source, target) {
+  if (currentDomain() === 'flowchart' && source.entityType.startsWith('flow_') && target.entityType.startsWith('flow_')) {
+    return [
+      ['next', 'Next'],
+      ['yes', 'Yes'],
+      ['no', 'No'],
+      ['loop', 'Loop'],
+      ['error', 'Error'],
+    ];
+  }
   const directKey = `${broadEntityType(source.entityType)}:${broadEntityType(target.entityType)}`;
   const direct = RELATIONSHIP_OPTIONS[directKey];
   let options = direct || null;
@@ -2124,6 +2239,14 @@ function initSearch() {
       return;
     }
     searchTimer = setTimeout(async () => {
+      if (currentDomain() !== 'social') {
+        showSearchResults({
+          diagram_nodes: graph.nodes
+            .filter(node => (node.label || '').toLowerCase().includes(q.toLowerCase()))
+            .map(node => ({ id: node.id, name: node.label, type: node.entityType })),
+        });
+        return;
+      }
       const results = await apiSearchAll(q).catch(() => null);
       if (!results) return;
       showSearchResults(results);
@@ -2146,6 +2269,7 @@ function initSearch() {
     const all = [];
     (data.persons || []).forEach(p => all.push({ id: p.id, name: p.name, type: 'person' }));
     (data.organizations || []).forEach(o => all.push({ id: o.id, name: o.name, type: o.type }));
+    (data.diagram_nodes || []).forEach(d => all.push({ id: d.id, name: d.name, type: d.type }));
     (data.locations || []).forEach(l => all.push({ id: l.id, name: l.name, type: 'location' }));
     (data.tags || []).forEach(t => all.push({ id: t.id, name: t.name, type: 'tag' }));
     if (!all.length) return;

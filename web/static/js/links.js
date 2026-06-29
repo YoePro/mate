@@ -2,7 +2,7 @@
 
 const SVG_OFFSET = 4000;
 
-function getLinkPath(source, target, offset = 0) {
+function getLinkPath(source, target, offset = { x: 0, y: 0 }) {
   const sx = source.x + SVG_OFFSET;
   const sy = source.y + SVG_OFFSET;
   const tx = target.x + SVG_OFFSET;
@@ -11,19 +11,13 @@ function getLinkPath(source, target, offset = 0) {
   const dy = ty - sy;
   const cx = dx / 2;
   const cy = dy / 2;
-  const length = Math.sqrt(dx * dx + dy * dy) || 1;
-  const nx = (-dy / length) * offset;
-  const ny = (dx / length) * offset;
-  return `M ${sx} ${sy} C ${sx + cx + nx} ${sy + ny}, ${tx - cx + nx} ${ty + ny}, ${tx} ${ty}`;
+  return `M ${sx} ${sy} C ${sx + cx + offset.x} ${sy + cy + offset.y}, ${tx - cx + offset.x} ${ty - cy + offset.y}, ${tx} ${ty}`;
 }
 
-function getLinkMidpoint(source, target, offset = 0) {
-  const dx = target.x - source.x;
-  const dy = target.y - source.y;
-  const length = Math.sqrt(dx * dx + dy * dy) || 1;
+function getLinkMidpoint(source, target, offset = { x: 0, y: 0 }) {
   return {
-    x: (source.x + target.x) / 2 + SVG_OFFSET + (-dy / length) * offset,
-    y: (source.y + target.y) / 2 + SVG_OFFSET + (dx / length) * offset,
+    x: (source.x + target.x) / 2 + SVG_OFFSET + offset.x,
+    y: (source.y + target.y) / 2 + SVG_OFFSET + offset.y,
   };
 }
 
@@ -41,11 +35,22 @@ const REL_LABELS = {
   sponsors: 'sponsors',
   partner_of: 'partner of',
   owns: 'owns',
+  next: 'next',
+  yes: 'yes',
+  no: 'no',
+  loop: 'loop',
+  error: 'error',
 };
 
 function relationshipLabel(link) {
   if (link && link.customLabel) return link.customLabel;
   return REL_LABELS[link.type] || link.type;
+}
+
+function relationshipStyleClass(link) {
+  const type = link && link.type ? String(link.type) : '';
+  if (['next', 'yes', 'no', 'loop', 'error'].includes(type)) return `link-type-${type}`;
+  return '';
 }
 
 function renderAllLinks() {
@@ -72,6 +77,24 @@ function linkOffset(link) {
   return (index - (pairLinks.length - 1) / 2) * 34;
 }
 
+function linkOffsetVector(link, source, target) {
+  const offset = linkOffset(link);
+  if (!offset) return { x: 0, y: 0 };
+
+  const ids = [link.sourceId, link.targetId].sort();
+  const canonicalSource = graph.getNode(ids[0]);
+  const canonicalTarget = graph.getNode(ids[1]);
+  const from = canonicalSource || source;
+  const to = canonicalTarget || target;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.sqrt(dx * dx + dy * dy) || 1;
+  return {
+    x: (-dy / length) * offset,
+    y: (dx / length) * offset,
+  };
+}
+
 function renderLink(link) {
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
@@ -79,7 +102,7 @@ function renderLink(link) {
   if (graph.isNodeHidden(source.id) || graph.isNodeHidden(target.id)) return;
 
   const layer = el('links-layer');
-  const offset = linkOffset(link);
+  const offset = linkOffsetVector(link, source, target);
 
   const path = svgEl('path', {
     'd': getLinkPath(source, target, offset),
@@ -96,7 +119,11 @@ function renderLink(link) {
   });
   text.textContent = relationshipLabel(link);
 
-  const g = svgEl('g', { 'data-link-group': link.id });
+  const styleClass = relationshipStyleClass(link);
+  const g = svgEl('g', {
+    'data-link-group': link.id,
+    'class': styleClass,
+  });
   g.appendChild(path);
   g.appendChild(text);
 

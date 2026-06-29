@@ -202,9 +202,12 @@ Request:
 ```json
 {
   "name": "Family",
-  "description": "Close family and shared history"
+  "description": "Close family and shared history",
+  "domain": "social"
 }
 ```
+
+`domain` is optional and defaults to `social`. Supported values in 0.15 are `social` and `flowchart`.
 
 ### GET /api/v1/networks/search?q={query}
 
@@ -220,6 +223,7 @@ Response:
     "id": "network-123",
     "name": "Family",
     "description": "Close family and shared history",
+    "domain": "social",
     "owned": true,
     "can_edit": true
   },
@@ -227,6 +231,7 @@ Response:
     "id": "network-456",
     "name": "Duckburg",
     "description": "Discoverable metadata only",
+    "domain": "social",
     "owned": false,
     "can_edit": false
   }
@@ -240,6 +245,16 @@ Returns one owned network.
 ### PUT /api/v1/networks/{id}
 
 Updates owned network metadata.
+
+Request:
+
+```json
+{
+  "name": "Process Map",
+  "description": "Operational flow",
+  "domain": "flowchart"
+}
+```
 
 ### POST /api/v1/networks/{id}/archive
 
@@ -256,7 +271,8 @@ Response:
   "network": {
     "id": "network-123",
     "owner_id": "acct-123",
-    "name": "Family"
+    "name": "Family",
+    "domain": "social"
   },
   "persons": [
     {
@@ -294,6 +310,31 @@ Request:
   "y": 180
 }
 ```
+
+### POST /api/v1/networks/{id}/diagram-nodes
+
+Creates a network-scoped diagram node. In 0.15 this is used by the Flowchart domain.
+
+Request:
+
+```json
+{
+  "type": "flow_process",
+  "name": "Validate order",
+  "description": "Check stock and payment",
+  "notes": "Diagram-only node"
+}
+```
+
+Supported initial `type` values are `flow_start`, `flow_stop`, `flow_process`, `flow_decision`, `flow_input`, `flow_output`, `flow_merge`, and `flow_delay`.
+
+### PUT /api/v1/networks/{id}/diagram-nodes/{nodeId}
+
+Updates a network-scoped diagram node.
+
+### DELETE /api/v1/networks/{id}/diagram-nodes/{nodeId}
+
+Permanently deletes a network-scoped diagram node, its network-scoped relationships, and its saved position.
 
 ### GET /api/v1/networks/{id}/relationship-types
 

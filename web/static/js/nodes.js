@@ -18,6 +18,14 @@ const NODE_COLORS = {
   project:     'var(--node-project)',
   location:    'var(--node-location)',
   tag:         'var(--node-tag)',
+  flow_start:  '#22c55e',
+  flow_stop:   '#ef4444',
+  flow_process:'#3b82f6',
+  flow_decision:'#f59e0b',
+  flow_input:  '#06b6d4',
+  flow_output: '#8b5cf6',
+  flow_merge:  '#14b8a6',
+  flow_delay:  '#64748b',
 };
 
 const NODE_ICONS = {
@@ -36,6 +44,14 @@ const NODE_ICONS = {
   project:     '<path d="M4 5h16v14H4z"/><path d="M8 5V3h8v2"/><path d="M8 10h8"/><path d="M8 14h5"/>',
   location:    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   tag:         '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  flow_start:  '<path d="M8 5h8a7 7 0 0 1 0 14H8A7 7 0 0 1 8 5z"/>',
+  flow_stop:   '<rect x="5" y="5" width="14" height="14" rx="3"/>',
+  flow_process:'<rect x="4" y="6" width="16" height="12" rx="1"/><path d="M8 10h8M8 14h5"/>',
+  flow_decision:'<path d="M12 3 21 12 12 21 3 12z"/><path d="M10 10h4M12 14h.01"/>',
+  flow_input:  '<path d="M6 5h15l-3 14H3z"/><path d="M8 10h8M7 14h7"/>',
+  flow_output: '<path d="M3 5h15l3 14H6z"/><path d="M8 10h8M9 14h7"/>',
+  flow_merge:  '<path d="M7 4v5a5 5 0 0 0 5 5h5"/><path d="M17 10l4 4-4 4"/><path d="M7 20v-5a5 5 0 0 1 5-5h1"/>',
+  flow_delay:  '<path d="M6 5h7a7 7 0 0 1 0 14H6z"/><path d="M6 5v14"/><path d="M9 10h4M9 14h3"/>',
 };
 
 const ENTITY_LABELS = {
@@ -54,6 +70,14 @@ const ENTITY_LABELS = {
   project: 'Project',
   location: 'Location',
   tag: 'Tag',
+  flow_start: 'Start',
+  flow_stop: 'Stop',
+  flow_process: 'Process',
+  flow_decision: 'Decision',
+  flow_input: 'Input',
+  flow_output: 'Output',
+  flow_merge: 'Merge',
+  flow_delay: 'Delay',
 };
 
 function getNodeColor(entityType, data) {

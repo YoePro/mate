@@ -194,6 +194,11 @@ const graph = (() => {
       nodes.push({ id: p.id, entityType: 'project', label: p.name, x: pos.x, y: pos.y, data: p });
     });
 
+    (data.diagram_nodes || []).forEach(d => {
+      const pos = posMap[`${d.id}:${d.type}`] || nextPos(idx++);
+      nodes.push({ id: d.id, entityType: d.type, label: d.name, x: pos.x, y: pos.y, data: d });
+    });
+
     (data.locations || []).forEach(l => {
       const pos = posMap[`${l.id}:location`] || nextPos(idx++);
       nodes.push({ id: l.id, entityType: 'location', label: l.name, x: pos.x, y: pos.y, data: l });

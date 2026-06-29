@@ -81,6 +81,10 @@
   padding: 4px 2px 0;
 }
 
+.hidden-domain {
+  display: none !important;
+}
+
 .tool-item {
   width: 100%;
   aspect-ratio: 1;
@@ -221,7 +225,7 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: var(--node-color, var(--text-muted));
+  background: var(--tool-node-color, var(--node-color, var(--text-muted)));
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -233,21 +237,29 @@
   height: 17px;
 }
 
-.icon-person-male { --node-color: var(--node-person-male); }
-.icon-person-female { --node-color: var(--node-person-female); }
-.icon-person-other { --node-color: var(--node-person-other); }
-.icon-family { --node-color: var(--text-muted); }
-.icon-company { --node-color: var(--node-company); }
-.icon-association { --node-color: var(--node-association); }
-.icon-school { --node-color: var(--node-school); }
-.icon-government { --node-color: var(--node-government); }
-.icon-political-party { --node-color: var(--node-political-party); }
-.icon-religious-organization { --node-color: var(--node-religious-organization); }
-.icon-sports-club { --node-color: var(--node-sports-club); }
-.icon-military-unit { --node-color: var(--node-military-unit); }
-.icon-ngo { --node-color: var(--node-ngo); }
-.icon-community { --node-color: var(--node-community); }
-.icon-project { --node-color: var(--node-project); }
+.icon-person-male { --tool-node-color: var(--node-person-male); }
+.icon-person-female { --tool-node-color: var(--node-person-female); }
+.icon-person-other { --tool-node-color: var(--node-person-other); }
+.icon-family { --tool-node-color: var(--text-muted); }
+.icon-company { --tool-node-color: var(--node-company); }
+.icon-association { --tool-node-color: var(--node-association); }
+.icon-school { --tool-node-color: var(--node-school); }
+.icon-government { --tool-node-color: var(--node-government); }
+.icon-political-party { --tool-node-color: var(--node-political-party); }
+.icon-religious-organization { --tool-node-color: var(--node-religious-organization); }
+.icon-sports-club { --tool-node-color: var(--node-sports-club); }
+.icon-military-unit { --tool-node-color: var(--node-military-unit); }
+.icon-ngo { --tool-node-color: var(--node-ngo); }
+.icon-community { --tool-node-color: var(--node-community); }
+.icon-project { --tool-node-color: var(--node-project); }
+.icon-flow-start { --tool-node-color: #22c55e; }
+.icon-flow-stop { --tool-node-color: #ef4444; }
+.icon-flow-process { --tool-node-color: #3b82f6; }
+.icon-flow-decision { --tool-node-color: #f59e0b; }
+.icon-flow-input { --tool-node-color: #06b6d4; }
+.icon-flow-output { --tool-node-color: #8b5cf6; }
+.icon-flow-merge { --tool-node-color: #14b8a6; }
+.icon-flow-delay { --tool-node-color: #64748b; }
 
 .toolbox-hint {
   margin-top: auto;

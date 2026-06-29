@@ -5,6 +5,34 @@ let pendingEntityDefaults = null;
 let dragPhantom = null;
 let selectionMarquee = null;
 
+const DOMAIN_ENTITY_TYPES = {
+  social: new Set([
+    'person',
+    'project',
+    'company',
+    'association',
+    'school',
+    'government',
+    'political_party',
+    'religious_organization',
+    'sports_club',
+    'military_unit',
+    'ngo',
+    'community',
+    'family',
+  ]),
+  flowchart: new Set([
+    'flow_start',
+    'flow_stop',
+    'flow_process',
+    'flow_decision',
+    'flow_input',
+    'flow_output',
+    'flow_merge',
+    'flow_delay',
+  ]),
+};
+
 function initToolbox() {
   initToolboxSections();
   graph.on('selection-changed', updateDataToolState);
@@ -13,6 +41,8 @@ function initToolbox() {
   qsa('[data-tool-action]').forEach(item => {
     item.addEventListener('click', () => runToolAction(item.dataset.toolAction));
   });
+  updateToolboxIconColors();
+  updateToolboxDomain();
   updateToolboxAccess();
   updateDataToolState();
 
@@ -85,6 +115,36 @@ function initToolbox() {
     cancelAddMode();
     openAddModal(type, pos.x, pos.y, defaults);
   });
+}
+
+function entityAllowedInCurrentDomain(entityType) {
+  const domain = typeof currentDomain === 'function' ? currentDomain() : 'social';
+  const allowed = DOMAIN_ENTITY_TYPES[domain] || DOMAIN_ENTITY_TYPES.social;
+  return allowed.has(entityType);
+}
+
+function updateToolboxIconColors() {
+  qsa('[data-entity]').forEach(item => {
+    const entityType = item.dataset.entity;
+    if (!entityType) return;
+    item.style.setProperty('--node-color', getNodeColor(entityType, entityDefaultsFromElement(item)));
+  });
+}
+
+function updateToolboxDomain() {
+  qsa('[data-entity]').forEach(item => {
+    item.classList.toggle('hidden-domain', !entityAllowedInCurrentDomain(item.dataset.entity));
+  });
+  qsa('.tool-icon-grid').forEach(grid => {
+    const buttons = qsa('[data-entity]', grid);
+    const hasVisibleDomainItem = buttons.some(button => !button.classList.contains('hidden-domain'));
+    grid.classList.toggle('hidden-domain', buttons.length > 0 && !hasVisibleDomainItem);
+    const heading = grid.previousElementSibling;
+    if (heading && heading.classList.contains('toolbox-subheading')) {
+      heading.classList.toggle('hidden-domain', buttons.length > 0 && !hasVisibleDomainItem);
+    }
+  });
+  updateToolboxAccess();
 }
 
 function initToolboxSections() {
@@ -183,7 +243,7 @@ function runToolAction(action) {
 function updateToolboxAccess() {
   const canWrite = canWriteData();
   qsa('[data-entity]').forEach(item => {
-    item.disabled = !canWrite || item.classList.contains('tool-icon-disabled');
+    item.disabled = !canWrite || !entityAllowedInCurrentDomain(item.dataset.entity) || item.classList.contains('tool-icon-disabled');
   });
   const autoLayout = qs('[data-tool-action="auto-layout"]');
   if (autoLayout) autoLayout.disabled = !canWrite;

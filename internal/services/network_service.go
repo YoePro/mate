@@ -21,7 +21,11 @@ func (s *NetworkService) Create(ctx context.Context, actor *models.Account, netw
 	}
 	network.Name = normalizeSpace(network.Name)
 	network.Description = normalizeSpace(network.Description)
+	network.Domain = normalizeNetworkDomain(network.Domain)
 	if network.Name == "" {
+		return nil, ErrInvalidInput
+	}
+	if !validNetworkDomain(network.Domain) {
 		return nil, ErrInvalidInput
 	}
 	if network.ID == "" {
@@ -68,7 +72,11 @@ func (s *NetworkService) Update(ctx context.Context, actor *models.Account, id s
 	network.OwnerID = actor.ID
 	network.Name = normalizeSpace(network.Name)
 	network.Description = normalizeSpace(network.Description)
+	network.Domain = normalizeNetworkDomain(network.Domain)
 	if network.Name == "" {
+		return nil, ErrInvalidInput
+	}
+	if !validNetworkDomain(network.Domain) {
 		return nil, ErrInvalidInput
 	}
 	return s.store.UpdateNetwork(ctx, network)
@@ -86,6 +94,13 @@ func (s *NetworkService) Archive(ctx context.Context, actor *models.Account, id 
 func (s *NetworkService) AddPerson(ctx context.Context, actor *models.Account, networkID string, person models.Person, context models.NetworkPersonContext) (*models.NetworkPerson, error) {
 	if err := s.requireOwner(ctx, actor, networkID); err != nil {
 		return nil, err
+	}
+	network, err := s.store.GetNetwork(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	if normalizeNetworkDomain(network.Domain) != "social" {
+		return nil, ErrInvalidInput
 	}
 	person.Name = normalizeSpace(person.Name)
 	context.NetworkID = networkID
@@ -168,6 +183,99 @@ func (s *NetworkService) SavePosition(ctx context.Context, actor *models.Account
 		return ErrInvalidInput
 	}
 	return s.store.SaveNetworkPosition(ctx, networkID, position)
+}
+
+// CreateDiagramNode creates a diagram-only node scoped to an owned network.
+func (s *NetworkService) CreateDiagramNode(ctx context.Context, actor *models.Account, networkID string, node models.DiagramNode) (*models.DiagramNode, error) {
+	if err := s.requireOwner(ctx, actor, networkID); err != nil {
+		return nil, err
+	}
+	network, err := s.store.GetNetwork(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	if normalizeNetworkDomain(network.Domain) != "flowchart" {
+		return nil, ErrInvalidInput
+	}
+	node.NetworkID = networkID
+	node.Type = normalizeSpace(node.Type)
+	node.Name = normalizeSpace(node.Name)
+	node.Description = normalizeSpace(node.Description)
+	node.Notes = normalizeSpace(node.Notes)
+	if node.ID == "" {
+		node.ID = newID("diag")
+	}
+	if !validDiagramNodeType(node.Type) || node.Name == "" {
+		return nil, ErrInvalidInput
+	}
+	return s.store.CreateDiagramNode(ctx, node)
+}
+
+// UpdateDiagramNode updates a diagram-only node scoped to an owned network.
+func (s *NetworkService) UpdateDiagramNode(ctx context.Context, actor *models.Account, networkID string, id string, node models.DiagramNode) (*models.DiagramNode, error) {
+	if err := s.requireOwner(ctx, actor, networkID); err != nil {
+		return nil, err
+	}
+	network, err := s.store.GetNetwork(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
+	if normalizeNetworkDomain(network.Domain) != "flowchart" {
+		return nil, ErrInvalidInput
+	}
+	node.ID = id
+	node.NetworkID = networkID
+	node.Type = normalizeSpace(node.Type)
+	node.Name = normalizeSpace(node.Name)
+	node.Description = normalizeSpace(node.Description)
+	node.Notes = normalizeSpace(node.Notes)
+	if !validDiagramNodeType(node.Type) || node.Name == "" {
+		return nil, ErrInvalidInput
+	}
+	return s.store.UpdateDiagramNode(ctx, node)
+}
+
+// DeleteDiagramNode permanently removes a diagram-only node scoped to an owned network.
+func (s *NetworkService) DeleteDiagramNode(ctx context.Context, actor *models.Account, networkID string, id string) error {
+	if err := s.requireOwner(ctx, actor, networkID); err != nil {
+		return err
+	}
+	return s.store.DeleteDiagramNode(ctx, networkID, id)
+}
+
+// ValidateRelationshipForNetwork enforces domain-specific relationship rules for an owned network.
+func (s *NetworkService) ValidateRelationshipForNetwork(ctx context.Context, actor *models.Account, relationship models.Relationship) error {
+	if relationship.NetworkID == "" {
+		return nil
+	}
+	network, err := s.Get(ctx, actor, relationship.NetworkID)
+	if err != nil {
+		return err
+	}
+	domain := normalizeNetworkDomain(network.Domain)
+	switch domain {
+	case "flowchart":
+		if !isDiagramNodeType(relationship.SourceType) ||
+			!isDiagramNodeType(relationship.TargetType) ||
+			!validFlowchartRelationshipType(relationship.Type) {
+			return ErrInvalidInput
+		}
+		if _, err := s.store.GetDiagramNode(ctx, relationship.NetworkID, relationship.SourceID); err != nil {
+			return err
+		}
+		if _, err := s.store.GetDiagramNode(ctx, relationship.NetworkID, relationship.TargetID); err != nil {
+			return err
+		}
+	case "social":
+		if isDiagramNodeType(relationship.SourceType) ||
+			isDiagramNodeType(relationship.TargetType) ||
+			validFlowchartRelationshipType(relationship.Type) {
+			return ErrInvalidInput
+		}
+	default:
+		return ErrInvalidInput
+	}
+	return nil
 }
 
 // CreateCustomRelationshipType creates or updates a reusable custom relationship type for an owned network.
@@ -304,6 +412,45 @@ func requireActiveActor(actor *models.Account) error {
 		return ErrUnauthorized
 	}
 	return nil
+}
+
+func normalizeNetworkDomain(domain string) string {
+	domain = normalizeSpace(domain)
+	if domain == "" {
+		return "social"
+	}
+	return strings.ToLower(domain)
+}
+
+func validNetworkDomain(domain string) bool {
+	switch domain {
+	case "social", "flowchart":
+		return true
+	default:
+		return false
+	}
+}
+
+func validDiagramNodeType(value string) bool {
+	switch value {
+	case "flow_start", "flow_stop", "flow_process", "flow_decision", "flow_input", "flow_output", "flow_merge", "flow_delay":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDiagramNodeType(value string) bool {
+	return strings.HasPrefix(value, "flow_")
+}
+
+func validFlowchartRelationshipType(value models.RelationshipType) bool {
+	switch value {
+	case models.RelationshipNext, models.RelationshipYes, models.RelationshipNo, models.RelationshipLoop, models.RelationshipError:
+		return true
+	default:
+		return false
+	}
 }
 
 func scorePersonMatch(req models.PersonMatchRequest, person models.Person) (float64, []string) {

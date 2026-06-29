@@ -55,6 +55,7 @@ func (s *Storage) EnsureSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT mate_organization_id IF NOT EXISTS FOR (o:Organization) REQUIRE o.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_organization_attribute_id IF NOT EXISTS FOR (a:OrganizationAttribute) REQUIRE a.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_project_id IF NOT EXISTS FOR (p:Project) REQUIRE p.id IS UNIQUE",
+		"CREATE CONSTRAINT mate_diagram_node_id IF NOT EXISTS FOR (d:DiagramNode) REQUIRE d.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_custom_relationship_type_id IF NOT EXISTS FOR (t:CustomRelationshipType) REQUIRE t.id IS UNIQUE",
 		"CREATE CONSTRAINT mate_custom_relationship_type_key IF NOT EXISTS FOR (t:CustomRelationshipType) REQUIRE (t.network_id, t.key, t.source_type, t.target_type) IS UNIQUE",
 		"CREATE CONSTRAINT mate_position_key IF NOT EXISTS FOR (p:Position) REQUIRE (p.node_id, p.node_type) IS UNIQUE",
@@ -300,6 +301,7 @@ func (s *Storage) CreateNetwork(ctx context.Context, network models.Network) (*m
 				owner_id: $owner_id,
 				name: $name,
 				description: $description,
+				domain: $domain,
 				archived: false
 			})`),
 			networkParams(network),
@@ -372,10 +374,12 @@ func (s *Storage) SearchNetworks(ctx context.Context, accountID string, query st
 			  AND (
 			    toLower(n.name) CONTAINS toLower($query)
 			    OR toLower(coalesce(n.description, '')) CONTAINS toLower($query)
+			    OR toLower(coalesce(n.domain, 'social')) CONTAINS toLower($query)
 			  )
 			RETURN n.id AS id,
 			       n.name AS name,
 			       n.description AS description,
+			       coalesce(n.domain, 'social') AS domain,
 			       n.owner_id = $account_id AS owned,
 			       n.owner_id = $account_id AS can_edit
 			ORDER BY owned DESC, toLower(n.name)
@@ -392,6 +396,7 @@ func (s *Storage) SearchNetworks(ctx context.Context, accountID string, query st
 				ID:          asString(record, "id"),
 				Name:        asString(record, "name"),
 				Description: asString(record, "description"),
+				Domain:      asString(record, "domain"),
 				Owned:       asBool(record, "owned"),
 				CanEdit:     asBool(record, "can_edit"),
 			})
@@ -410,7 +415,8 @@ func (s *Storage) UpdateNetwork(ctx context.Context, network models.Network) (*m
 		result, err := tx.Run(ctx, networkReturnQuery(`
 			MATCH (n:Network {id: $id})
 			SET n.name = $name,
-			    n.description = $description`),
+			    n.description = $description,
+			    n.domain = $domain`),
 			networkParams(network),
 		)
 		if err != nil {
@@ -623,6 +629,10 @@ func (s *Storage) GetNetworkGraph(ctx context.Context, networkID string) (*model
 	if err != nil {
 		return nil, err
 	}
+	diagramNodes, err := s.listNetworkDiagramNodes(ctx, networkID)
+	if err != nil {
+		return nil, err
+	}
 	positions, err := s.listNetworkPositions(ctx, networkID)
 	if err != nil {
 		return nil, err
@@ -636,6 +646,7 @@ func (s *Storage) GetNetworkGraph(ctx context.Context, networkID string) (*model
 		Persons:                 persons,
 		Organizations:           organizations,
 		Projects:                projects,
+		DiagramNodes:            diagramNodes,
 		Relationships:           relationships,
 		Positions:               positions,
 		CustomRelationshipTypes: customRelationshipTypes,
@@ -1250,6 +1261,119 @@ func (s *Storage) DeleteProject(ctx context.Context, id string) error {
 	return s.archiveNode(ctx, "Project", id)
 }
 
+// CreateDiagramNode creates a network-scoped diagram-only node.
+func (s *Storage) CreateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, diagramNodeReturnQuery(`
+			MATCH (n:Network {id: $network_id})
+			CREATE (n)-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode {
+				id: $id,
+				network_id: $network_id,
+				type: $type,
+				name: $name,
+				description: $description,
+				notes: $notes,
+				archived: false
+			})`),
+			diagramNodeParams(node),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		created := diagramNodeFromRecord(record)
+		return &created, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.DiagramNode), nil
+}
+
+// GetDiagramNode returns one network-scoped diagram node.
+func (s *Storage) GetDiagramNode(ctx context.Context, networkID string, id string) (*models.DiagramNode, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, diagramNodeReturnQuery(`
+			MATCH (:Network {id: $network_id})-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode {id: $id})
+			WHERE coalesce(d.archived, false) = false`),
+			map[string]any{"network_id": networkID, "id": id},
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		node := diagramNodeFromRecord(record)
+		return &node, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.DiagramNode), nil
+}
+
+// UpdateDiagramNode updates a network-scoped diagram node.
+func (s *Storage) UpdateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error) {
+	value, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, diagramNodeReturnQuery(`
+			MATCH (:Network {id: $network_id})-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode {id: $id})
+			WHERE coalesce(d.archived, false) = false
+			SET d.type = $type,
+			    d.name = $name,
+			    d.description = $description,
+			    d.notes = $notes`),
+			diagramNodeParams(node),
+		)
+		if err != nil {
+			return nil, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return nil, storage.ErrNotFound
+		}
+		updated := diagramNodeFromRecord(record)
+		return &updated, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*models.DiagramNode), nil
+}
+
+// DeleteDiagramNode permanently removes a network-scoped diagram node.
+func (s *Storage) DeleteDiagramNode(ctx context.Context, networkID string, id string) error {
+	_, err := s.write(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		params := map[string]any{"network_id": networkID, "id": id}
+		if _, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode {id: $id})-[r]-()
+			WHERE r.network_id = $network_id
+			DELETE r`,
+			params,
+		); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[positionRel:HAS_POSITION]->(position:NetworkPosition {node_id: $id})
+			DELETE positionRel, position`,
+			params,
+		); err != nil {
+			return nil, err
+		}
+		_, err := tx.Run(ctx, `
+			MATCH (:Network {id: $network_id})-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode {id: $id})
+			DETACH DELETE d`,
+			params,
+		)
+		return nil, err
+	})
+	return err
+}
+
 // GetOrganizationProfile returns an organization with attributes and relationships.
 func (s *Storage) GetOrganizationProfile(ctx context.Context, id string) (*models.OrganizationProfile, error) {
 	organization, err := s.GetOrganization(ctx, id)
@@ -1418,9 +1542,9 @@ func (s *Storage) CreateRelationship(ctx context.Context, relationship models.Re
 		       r.network_id AS network_id,
 		       type(r) AS type,
 		       source.id AS source_id,
-		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' WHEN source:DiagramNode THEN source.type ELSE 'person' END) AS source_type,
 		       target.id AS target_id,
-		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' WHEN target:DiagramNode THEN target.type ELSE 'person' END) AS target_type,
 		       r.custom_label AS custom_label,
 		       r.role AS role,
 		       r.start_date AS start_date,
@@ -1488,9 +1612,9 @@ func (s *Storage) UpdateRelationship(ctx context.Context, relationship models.Re
 		       r.network_id AS network_id,
 		       type(r) AS type,
 		       source.id AS source_id,
-		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' WHEN source:DiagramNode THEN source.type ELSE 'person' END) AS source_type,
 		       target.id AS target_id,
-		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' WHEN target:DiagramNode THEN target.type ELSE 'person' END) AS target_type,
 		       r.custom_label AS custom_label,
 		       r.role AS role,
 		       r.start_date AS start_date,
@@ -1810,6 +1934,28 @@ func (s *Storage) listNetworkProjects(ctx context.Context, networkID string) ([]
 	return value.([]models.Project), nil
 }
 
+func (s *Storage) listNetworkDiagramNodes(ctx context.Context, networkID string) ([]models.DiagramNode, error) {
+	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, diagramNodeReturnQuery(`
+			MATCH (:Network {id: $network_id})-[:CONTAINS_DIAGRAM_NODE]->(d:DiagramNode)
+			WHERE coalesce(d.archived, false) = false`)+" ORDER BY toLower(d.name)",
+			map[string]any{"network_id": networkID},
+		)
+		if err != nil {
+			return nil, err
+		}
+		nodes := make([]models.DiagramNode, 0)
+		for result.Next(ctx) {
+			nodes = append(nodes, diagramNodeFromRecord(result.Record()))
+		}
+		return nodes, result.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.([]models.DiagramNode), nil
+}
+
 func (s *Storage) listNetworkPositions(ctx context.Context, networkID string) ([]models.Position, error) {
 	value, err := s.read(ctx, func(tx driver.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, `
@@ -2012,6 +2158,7 @@ func networkParams(network models.Network) map[string]any {
 		"owner_id":    network.OwnerID,
 		"name":        network.Name,
 		"description": network.Description,
+		"domain":      network.Domain,
 		"archived":    network.Archived,
 	}
 }
@@ -2053,6 +2200,18 @@ func projectParams(project models.Project) map[string]any {
 		"active":      project.Active,
 		"web":         project.Web,
 		"archived":    project.Archived,
+	}
+}
+
+func diagramNodeParams(node models.DiagramNode) map[string]any {
+	return map[string]any{
+		"id":          node.ID,
+		"network_id":  node.NetworkID,
+		"type":        node.Type,
+		"name":        node.Name,
+		"description": node.Description,
+		"notes":       node.Notes,
+		"archived":    node.Archived,
 	}
 }
 
@@ -2142,6 +2301,7 @@ func networkFromRecord(record *driver.Record) models.Network {
 		OwnerID:     asString(record, "owner_id"),
 		Name:        asString(record, "name"),
 		Description: asString(record, "description"),
+		Domain:      asString(record, "domain"),
 		Archived:    asBool(record, "archived"),
 	}
 }
@@ -2203,6 +2363,18 @@ func projectFromRecord(record *driver.Record) models.Project {
 		Aliases:     asStringSlice(record, "aliases"),
 		Active:      asBool(record, "active"),
 		Web:         asString(record, "web"),
+		Archived:    asBool(record, "archived"),
+	}
+}
+
+func diagramNodeFromRecord(record *driver.Record) models.DiagramNode {
+	return models.DiagramNode{
+		ID:          asString(record, "id"),
+		NetworkID:   asString(record, "network_id"),
+		Type:        asString(record, "type"),
+		Name:        asString(record, "name"),
+		Description: asString(record, "description"),
+		Notes:       asString(record, "notes"),
 		Archived:    asBool(record, "archived"),
 	}
 }
@@ -2278,7 +2450,8 @@ func accountReturnQuery(prefix string) string {
 func networkReturnQuery(prefix string) string {
 	return prefix + `
 		RETURN n.id AS id, n.owner_id AS owner_id, n.name AS name,
-		       n.description AS description, n.archived AS archived`
+		       n.description AS description, coalesce(n.domain, 'social') AS domain,
+		       n.archived AS archived`
 }
 
 func networkPersonContextReturnQuery(prefix string) string {
@@ -2312,15 +2485,22 @@ func projectReturnQuery(prefix string) string {
 		       p.web AS web, p.archived AS archived`
 }
 
+func diagramNodeReturnQuery(prefix string) string {
+	return prefix + `
+		RETURN d.id AS id, d.network_id AS network_id, d.type AS type,
+		       d.name AS name, d.description AS description, d.notes AS notes,
+		       d.archived AS archived`
+}
+
 func relationshipReturnQuery(prefix string) string {
 	return prefix + `
 		RETURN r.id AS id,
 		       r.network_id AS network_id,
 		       type(r) AS type,
 		       source.id AS source_id,
-		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' ELSE 'person' END) AS source_type,
+		       coalesce(r.source_type, source.type, CASE WHEN source:Project THEN 'project' WHEN source:DiagramNode THEN source.type ELSE 'person' END) AS source_type,
 		       target.id AS target_id,
-		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' ELSE 'person' END) AS target_type,
+		       coalesce(r.target_type, target.type, CASE WHEN target:Project THEN 'project' WHEN target:DiagramNode THEN target.type ELSE 'person' END) AS target_type,
 		       r.custom_label AS custom_label,
 		       r.role AS role,
 		       r.start_date AS start_date,

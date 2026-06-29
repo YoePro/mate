@@ -13,6 +13,7 @@ type GraphResponse struct {
 	Persons       []Person         `json:"persons"`
 	Organizations []Organization   `json:"organizations"`
 	Projects      []Project        `json:"projects"`
+	DiagramNodes  []DiagramNode    `json:"diagram_nodes,omitempty"`
 	Locations     []map[string]any `json:"locations"`
 	Tags          []map[string]any `json:"tags"`
 	Relationships []Relationship   `json:"relationships"`

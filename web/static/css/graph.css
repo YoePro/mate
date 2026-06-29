@@ -220,16 +220,17 @@
 
 /* Graph links */
 .graph-link {
-  stroke: #3a3d47;
+  stroke: var(--link-color, #3a3d47);
   stroke-width: 2;
   fill: none;
   pointer-events: stroke;
   cursor: pointer;
+  stroke-dasharray: var(--link-dash, none);
   transition: stroke 0.15s;
 }
 
 .graph-link:hover {
-  stroke: var(--text-muted);
+  stroke: var(--link-hover-color, var(--text-muted));
 }
 
 .graph-link.selected {
@@ -238,7 +239,7 @@
 
 .link-label {
   font-size: 10px;
-  fill: var(--text-muted);
+  fill: var(--link-label-color, var(--text-muted));
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
@@ -246,6 +247,35 @@
   paint-order: stroke;
   stroke: var(--bg-base);
   stroke-width: 4px;
+}
+
+.link-type-next {
+  --link-color: #64748b;
+  --link-hover-color: #94a3b8;
+}
+
+.link-type-yes {
+  --link-color: #22c55e;
+  --link-hover-color: #4ade80;
+  --link-label-color: #86efac;
+}
+
+.link-type-no,
+.link-type-error {
+  --link-color: #ef4444;
+  --link-hover-color: #f87171;
+  --link-label-color: #fca5a5;
+}
+
+.link-type-loop {
+  --link-color: #f59e0b;
+  --link-hover-color: #fbbf24;
+  --link-label-color: #fcd34d;
+  --link-dash: 7 5;
+}
+
+.link-type-error {
+  --link-dash: 3 4;
 }
 
 /* Drag phantom */

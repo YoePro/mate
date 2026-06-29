@@ -178,6 +178,25 @@ For remote development, use the remote machine host or IP with port `8325`.
 - Simulate or observe an attribute API failure and confirm the error state is visually distinct from the empty state.
 - Confirm attribute save errors use an HTML dialog, not a browser alert.
 
+## 0.15 Domain Toolbox Checklist
+
+- Create or open a Social Network network and confirm the domain selector shows `Social Network`.
+- Confirm the Social Network Create toolbox shows person, organization, project, and family-placeholder tools.
+- Create a person in a Social Network network and confirm duplicate detection still appears for matching names.
+- Create a Flowchart network and confirm the domain selector shows `Flowchart`.
+- Confirm the Flowchart Create toolbox hides Social Network create tools.
+- Confirm Flowchart Start, Stop, Process, Decision, Input, Output, Merge, and Delay tools can create nodes.
+- Reload the Flowchart network and confirm created Flowchart nodes remain.
+- Create a Flowchart relationship using `next`, `yes`, `no`, `loop`, or `error`.
+- Confirm Flowchart relationship styles differ for `yes`, `no`, `loop`, and `error`.
+- Create two or more relationships between the same two nodes and confirm the links do not overlap.
+- Confirm direct API calls cannot create Flowchart nodes or Flowchart relationships in Social Network networks.
+- Confirm direct API calls cannot add persons or social relationships in Flowchart networks.
+- Confirm Flowchart search only searches the loaded graph, not global person or organization identity data.
+- Search networks and confirm result metadata includes the network domain.
+- Switch domains on an owned network and reload; confirm the selected domain is restored.
+- Confirm a viewer can see the selected domain but cannot change it.
+
 ## 0.13 Preference Checklist
 
 - Open account menu Preferences.

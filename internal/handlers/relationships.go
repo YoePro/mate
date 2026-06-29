@@ -36,11 +36,9 @@ func (api *API) Relationships(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid json")
 			return
 		}
-		if relationship.NetworkID != "" {
-			if _, err := api.services.Networks.Get(r.Context(), actor, relationship.NetworkID); err != nil {
-				writeServiceError(w, err)
-				return
-			}
+		if err := api.services.Networks.ValidateRelationshipForNetwork(r.Context(), actor, relationship); err != nil {
+			writeServiceError(w, err)
+			return
 		}
 		created, err := api.services.Relationships.Create(r.Context(), relationship)
 		if err != nil {
@@ -97,6 +95,19 @@ func (api *API) Relationship(w http.ResponseWriter, r *http.Request) {
 		var relationship models.Relationship
 		if err := decodeJSON(r, &relationship); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		validationRelationship := relationship
+		validationRelationship.NetworkID = existing.NetworkID
+		validationRelationship.SourceID = existing.SourceID
+		validationRelationship.SourceType = existing.SourceType
+		validationRelationship.TargetID = existing.TargetID
+		validationRelationship.TargetType = existing.TargetType
+		if validationRelationship.Type == "" {
+			validationRelationship.Type = existing.Type
+		}
+		if err := api.services.Networks.ValidateRelationshipForNetwork(r.Context(), actor, validationRelationship); err != nil {
+			writeServiceError(w, err)
 			return
 		}
 		updated, err := api.services.Relationships.Update(r.Context(), id, relationship)

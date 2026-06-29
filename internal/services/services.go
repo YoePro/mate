@@ -92,7 +92,12 @@ func validRelationshipType(value models.RelationshipType) bool {
 		models.RelationshipWorksOn,
 		models.RelationshipSponsors,
 		models.RelationshipPartnerOf,
-		models.RelationshipOwns:
+		models.RelationshipOwns,
+		models.RelationshipNext,
+		models.RelationshipYes,
+		models.RelationshipNo,
+		models.RelationshipLoop,
+		models.RelationshipError:
 		return true
 	default:
 		return validCustomRelationshipType(string(value))

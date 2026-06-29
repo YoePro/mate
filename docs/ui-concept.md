@@ -4,8 +4,8 @@ MATE uses a node based workspace inspired by Node RED, adapted for relationship 
 
 ## Main areas
 
-- Header: brand, selected network, network search, global search, graph controls, account menu, and connection status.
-- Toolbox: available node types for people, organizations, locations, and tags.
+- Header: brand, selected network, selected domain, network search, global search, graph controls, account menu, and connection status.
+- Toolbox: available tools for the selected network domain.
 - Workspace: canvas-like relationship map with SVG links and draggable nodes.
 - Inspector: selected node details and related connections.
 - Modals: create and edit nodes or relationships, administer accounts, and manage network actions as 0.13 grows.
@@ -40,6 +40,25 @@ The selected network area supports both fast actions and a network actions menu.
 - Create, rename, and metadata edits use the same HTML dialog foundation.
 - Delete is treated as destructive and requires a second in-dialog confirmation.
 - Deleting a Social Network network removes it from the owner's network list but does not delete global person identities.
+
+## Domains and work modes
+
+0.15 introduces a lightweight network domain concept.
+
+- `social` is the default domain for relationship maps with global person identity behavior.
+- `flowchart` is the first experimental non-social domain.
+- The selected domain is stored on network metadata.
+- The header domain selector updates the current network domain.
+- The Create toolbox filters available node tools by domain.
+- Social Network shows person, organization, project, and family-placeholder tools.
+- Flowchart shows Start, Stop, Process, Decision, Input, Output, Merge, and Delay tools.
+- Flowchart creates network-scoped diagram nodes, not global identity nodes.
+- Duplicate person matching only runs for Social Network person creation.
+- Flowchart search is scoped to the currently loaded graph instead of global person and organization identity search.
+- Multiple relationships between the same two nodes render as separated curved links.
+- Flowchart relationships have first-pass visual styles: `yes` is green, `no` and `error` are red, and `loop` is dashed amber.
+
+Work modes remain lightweight in 0.15. The current domain can influence toolbox ordering, available tools, labels, and future export or print behavior, but domains are not database-configurable yet.
 
 ## Context menus
 

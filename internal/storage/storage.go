@@ -34,6 +34,10 @@ type Storage interface {
 	ArchiveNetworkPerson(ctx context.Context, networkID string, personID string) error
 	SaveNetworkPosition(ctx context.Context, networkID string, position models.Position) error
 	GetNetworkGraph(ctx context.Context, networkID string) (*models.NetworkGraphResponse, error)
+	CreateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error)
+	GetDiagramNode(ctx context.Context, networkID string, id string) (*models.DiagramNode, error)
+	UpdateDiagramNode(ctx context.Context, node models.DiagramNode) (*models.DiagramNode, error)
+	DeleteDiagramNode(ctx context.Context, networkID string, id string) error
 	CreateCustomRelationshipType(ctx context.Context, relationshipType models.CustomRelationshipType) (*models.CustomRelationshipType, error)
 	ListCustomRelationshipTypes(ctx context.Context, networkID string) ([]models.CustomRelationshipType, error)
 	ListPersonNetworkIDs(ctx context.Context, personID string) ([]string, error)

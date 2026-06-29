@@ -140,10 +140,75 @@ func (api *API) networkNested(w http.ResponseWriter, r *http.Request, actor *mod
 		api.networkPositions(w, r, actor, networkID)
 	case "relationship-types":
 		api.networkRelationshipTypes(w, r, actor, networkID)
+	case "diagram-nodes":
+		api.networkDiagramNodes(w, r, actor, networkID, parts[1:])
 	case "persons":
 		api.networkPersons(w, r, actor, networkID, parts[1:])
 	default:
 		writeError(w, http.StatusNotFound, "not found")
+	}
+}
+
+func (api *API) networkDiagramNodes(w http.ResponseWriter, r *http.Request, actor *models.Account, networkID string, parts []string) {
+	if len(parts) == 0 {
+		switch r.Method {
+		case http.MethodPost:
+			if err := api.requireDataWrite(r); err != nil {
+				writeServiceError(w, err)
+				return
+			}
+			var node models.DiagramNode
+			if err := decodeJSON(r, &node); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid json")
+				return
+			}
+			created, err := api.services.Networks.CreateDiagramNode(r.Context(), actor, networkID, node)
+			if err != nil {
+				writeServiceError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, created)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+		return
+	}
+
+	id := parts[0]
+	if id == "" || len(parts) > 1 {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		var node models.DiagramNode
+		if err := decodeJSON(r, &node); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		updated, err := api.services.Networks.UpdateDiagramNode(r.Context(), actor, networkID, id, node)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, updated)
+	case http.MethodDelete:
+		if err := api.requireDataWrite(r); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		if err := api.services.Networks.DeleteDiagramNode(r.Context(), actor, networkID, id); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusNoContent, nil)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 

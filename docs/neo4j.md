@@ -36,6 +36,7 @@ Current graph labels:
 - `Organization`
 - `OrganizationAttribute`
 - `Project`
+- `DiagramNode`
 - `CustomRelationshipType`
 - `Position`
 - `Network`
@@ -50,9 +51,23 @@ Network relationships:
 - `(:Account)-[:OWNS_NETWORK]->(:Network)`
 - `(:Network)-[:CONTAINS_PERSON]->(:Person)`
 - `(:Network)-[:HAS_POSITION]->(:NetworkPosition)`
+- `(:Network)-[:CONTAINS_DIAGRAM_NODE]->(:DiagramNode)`
 - `(:Network)-[:HAS_CUSTOM_RELATIONSHIP_TYPE]->(:CustomRelationshipType)`
 
 `CONTAINS_PERSON` stores network-specific `notes`, `context`, and `archived` properties.
+
+`CONTAINS_DIAGRAM_NODE` scopes diagram-only nodes, such as Flowchart nodes, to one network.
+
+Deleting a `DiagramNode` physically removes the node, its network-scoped relationships, and its saved network position.
+
+`Network` stores:
+
+- `id`
+- `owner_id`
+- `name`
+- `description`
+- `domain`
+- `archived`
 
 `CustomRelationshipType` stores:
 
