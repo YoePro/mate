@@ -108,6 +108,7 @@ function attachNodeEvents(wrap, node) {
     e.stopPropagation();
 
     if (e.shiftKey) {
+      if (!canWriteData()) return;
       handleLinkInteraction(node.id);
       return;
     }
@@ -119,6 +120,7 @@ function attachNodeEvents(wrap, node) {
     dragStarted = false;
 
     function onMove(ev) {
+      if (!canWriteData()) return;
       if (graph.isNodeLocked(node.id)) return;
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
@@ -153,6 +155,7 @@ function attachNodeEvents(wrap, node) {
 
   wrap.addEventListener('dblclick', (e) => {
     e.stopPropagation();
+    if (!canWriteData()) return;
     openEditModal(node.id);
   });
 

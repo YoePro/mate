@@ -75,6 +75,10 @@ function localOnlyWarning(action, err) {
   console.warn(`${action} is using temporary frontend state:`, err.message);
 }
 
+function canWriteData() {
+  return currentAccount && ['owner', 'admin', 'editor'].includes(currentAccount.role);
+}
+
 // ---- Boot ----
 
 let currentAccount = null;
@@ -733,9 +737,10 @@ function openNodeContextMenu(nodeId, x, y) {
   graph.selectNode(nodeId);
   const action = destructiveActionLabel(node.entityType);
   const locked = graph.isNodeLocked(nodeId);
+  const canWrite = canWriteData();
   openContextMenu([
-    { label: 'Edit', action: () => openEditModal(nodeId) },
-    { label: 'Create relationship from node', action: () => graph.setLinkSource(nodeId) },
+    { label: 'Edit', disabled: !canWrite, action: () => openEditModal(nodeId) },
+    { label: 'Create relationship from node', disabled: !canWrite, action: () => graph.setLinkSource(nodeId) },
     { label: 'Fit selection', action: () => canvas.fitToNodes([node]) },
     { label: 'Select same type', action: () => selectSameNodeType(nodeId) },
     { separator: true },
@@ -744,7 +749,7 @@ function openNodeContextMenu(nodeId, x, y) {
     { label: 'Lock', disabled: locked, action: () => graph.lockNodes([nodeId]) },
     { label: 'Unlock', disabled: !locked, action: () => graph.unlockNodes([nodeId]) },
     { separator: true },
-    { label: action, icon: 'trash', danger: true, action: () => deleteNodeWithDialog(nodeId) },
+    { label: action, icon: 'trash', danger: true, disabled: !canWrite, action: () => deleteNodeWithDialog(nodeId) },
   ], x, y);
 }
 
@@ -753,8 +758,9 @@ function openRelationshipContextMenu(linkId, x, y) {
   if (!link) return;
   const source = graph.getNode(link.sourceId);
   const target = graph.getNode(link.targetId);
+  const canWrite = canWriteData();
   openContextMenu([
-    { label: 'Edit relationship', action: () => openRelationshipEditModal(linkId) },
+    { label: 'Edit relationship', disabled: !canWrite, action: () => openRelationshipEditModal(linkId) },
     { label: 'Select connected nodes', action: () => {
       graph.selectNodes([link.sourceId, link.targetId]);
       canvas.fitToNodes([source, target].filter(Boolean));
@@ -764,14 +770,14 @@ function openRelationshipContextMenu(linkId, x, y) {
       canvas.fitToNodes([source, target].filter(Boolean));
     } },
     { separator: true },
-    { label: 'Delete relationship', icon: 'trash', danger: true, action: () => promptDeleteLink(linkId) },
+    { label: 'Delete relationship', icon: 'trash', danger: true, disabled: !canWrite, action: () => promptDeleteLink(linkId) },
   ], x, y);
 }
 
 function openCanvasContextMenu(x, y) {
   const pos = canvas.screenToWorld(x, y);
   openContextMenu([
-    { label: 'Create person here', action: () => openAddModal('person', pos.x, pos.y) },
+    { label: 'Create person here', disabled: !canWriteData(), action: () => openAddModal('person', pos.x, pos.y) },
     { label: 'Create organization here', disabled: true },
     { label: 'Paste', disabled: true },
     { separator: true },
@@ -1251,12 +1257,14 @@ function renderInspector(nodeId) {
   }
 
   const actions = createEl('div', 'inspector-actions');
-  const editBtn = createEl('button', 'btn btn-ghost');
-  editBtn.textContent = 'Edit';
-  editBtn.addEventListener('click', () => openEditModal(nodeId));
-  actions.appendChild(editBtn);
+  if (canWriteData()) {
+    const editBtn = createEl('button', 'btn btn-ghost');
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => openEditModal(nodeId));
+    actions.appendChild(editBtn);
+  }
 
-  if (node.entityType === 'person' || isOrganizationEntityType(node.entityType)) {
+  if (canWriteData() && (node.entityType === 'person' || isOrganizationEntityType(node.entityType))) {
     const attrBtn = createEl('button', 'btn btn-ghost');
     attrBtn.textContent = 'Add attribute';
     attrBtn.addEventListener('click', () => openAttributeModal(nodeId));
@@ -1482,6 +1490,7 @@ function initModals() {
 }
 
 function openAddModal(entityType, x, y, defaults) {
+  if (!canWriteData()) return;
   modalEntityType = entityType;
   modalEntityId = null;
   modalX = x;
@@ -1495,6 +1504,7 @@ function openAddModal(entityType, x, y, defaults) {
 }
 
 function openEditModal(nodeId) {
+  if (!canWriteData()) return;
   const node = graph.getNode(nodeId);
   if (!node) return;
   modalEntityType = node.entityType;
@@ -1560,6 +1570,7 @@ function buildModalForm(entityType, data) {
 }
 
 async function handleModalSave() {
+  if (!canWriteData()) return;
   const form = el('modal-form');
   const data = {};
 
@@ -1646,11 +1657,13 @@ async function maybeUseExistingPerson(data) {
 }
 
 async function handleModalDelete() {
+  if (!canWriteData()) return;
   if (!modalEntityId) return;
   await deleteNodeWithDialog(modalEntityId, { closeNodeModal: true });
 }
 
 async function deleteNodeWithDialog(nodeId, options) {
+  if (!canWriteData()) return;
   const node = graph.getNode(nodeId);
   if (!node) return;
   const action = destructiveActionLabel(node.entityType);
@@ -1718,6 +1731,7 @@ function initAttributeModal() {
 }
 
 function openAttributeModal(nodeId) {
+  if (!canWriteData()) return;
   const node = graph.getNode(nodeId);
   if (!node) return;
   attributeOwnerType = node.entityType === 'person' ? 'person' : 'organization';
@@ -1884,6 +1898,10 @@ function initLinkModal() {
 }
 
 function openLinkModal(sourceId, targetId) {
+  if (!canWriteData()) {
+    graph.setLinkSource(null);
+    return;
+  }
   linkEditingId = null;
   linkSourceNodeId = sourceId;
   linkTargetNodeId = targetId;
@@ -1911,6 +1929,7 @@ function openLinkModal(sourceId, targetId) {
 }
 
 function openRelationshipEditModal(linkId) {
+  if (!canWriteData()) return;
   const link = graph.getLink(linkId);
   if (!link) return;
   const source = graph.getNode(link.sourceId);
@@ -1987,6 +2006,7 @@ function relationshipFromAPI(rel) {
 }
 
 async function handleLinkSave() {
+  if (!canWriteData()) return;
   let type = el('link-type-select').value;
   const customLabel = el('link-custom-label').value.trim();
   let resolvedCustomLabel = customRelationshipLabel(type);
@@ -2073,6 +2093,7 @@ async function handleLinkSave() {
 }
 
 async function handleLinkDelete() {
+  if (!canWriteData()) return;
   if (!linkEditingId) return;
   await promptDeleteLink(linkEditingId);
   if (!graph.getLink(linkEditingId)) closeLinkModal();

@@ -13,6 +13,7 @@ function initToolbox() {
   qsa('[data-tool-action]').forEach(item => {
     item.addEventListener('click', () => runToolAction(item.dataset.toolAction));
   });
+  updateToolboxAccess();
   updateDataToolState();
 
   qsa('[data-entity]').forEach(item => {
@@ -20,6 +21,7 @@ function initToolbox() {
     if (!entityType) return;
 
     item.addEventListener('click', () => {
+      if (!canWriteData()) return;
       const defaults = entityDefaultsFromElement(item);
       if (pendingEntityType === entityType && sameDefaults(pendingEntityDefaults, defaults)) {
         cancelAddMode();
@@ -29,6 +31,10 @@ function initToolbox() {
     });
 
     item.addEventListener('dragstart', (e) => {
+      if (!canWriteData()) {
+        e.preventDefault();
+        return;
+      }
       const defaults = entityDefaultsFromElement(item);
       e.dataTransfer.setData('text/entity-type', entityType);
       if (defaults && defaults.gender) e.dataTransfer.setData('text/default-gender', defaults.gender);
@@ -56,6 +62,7 @@ function initToolbox() {
 
   workspace.addEventListener('drop', (e) => {
     e.preventDefault();
+    if (!canWriteData()) return;
     const entityType = e.dataTransfer.getData('text/entity-type');
     if (!entityType) return;
     const gender = e.dataTransfer.getData('text/default-gender');
@@ -67,6 +74,10 @@ function initToolbox() {
 
   workspace.addEventListener('click', (e) => {
     if (!pendingEntityType) return;
+    if (!canWriteData()) {
+      cancelAddMode();
+      return;
+    }
     if (e.target !== workspace && !e.target.closest('#workspace-empty')) return;
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
     const type = pendingEntityType;
@@ -149,6 +160,7 @@ function runToolAction(action) {
     graph.showHiddenNodes();
     break;
   case 'auto-layout':
+    if (!canWriteData()) return;
     autoLayoutVisibleNodes();
     break;
   case 'lock-selected':
@@ -158,12 +170,23 @@ function runToolAction(action) {
     unlockSelectedNodes();
     break;
   case 'edit-selected':
+    if (!canWriteData()) return;
     editSelectedNode();
     break;
   case 'delete-selected':
+    if (!canWriteData()) return;
     deleteSelectedNode();
     break;
   }
+}
+
+function updateToolboxAccess() {
+  const canWrite = canWriteData();
+  qsa('[data-entity]').forEach(item => {
+    item.disabled = !canWrite || item.classList.contains('tool-icon-disabled');
+  });
+  const autoLayout = qs('[data-tool-action="auto-layout"]');
+  if (autoLayout) autoLayout.disabled = !canWrite;
 }
 
 function selectedNodes() {
@@ -220,9 +243,10 @@ function primarySelectedNodeId() {
 }
 
 function updateDataToolState() {
+  const canWrite = canWriteData();
   const hasSelection = Boolean(primarySelectedNodeId());
   qsa('[data-requires-selection]').forEach(item => {
-    item.disabled = !hasSelection;
+    item.disabled = !canWrite || !hasSelection;
   });
 }
 

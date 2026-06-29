@@ -101,6 +101,7 @@ function renderLink(link) {
   g.appendChild(text);
 
   g.addEventListener('click', () => {
+    if (!canWriteData()) return;
     openRelationshipEditModal(link.id);
   });
 
@@ -131,6 +132,7 @@ function updateLinksForNode(nodeId) {
 }
 
 async function promptDeleteLink(linkId) {
+  if (!canWriteData()) return;
   const link = graph.getLink(linkId);
   if (!link) return;
   const source = graph.getNode(link.sourceId);
